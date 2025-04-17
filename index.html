@@ -1,0 +1,2065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Solar System & Exoplanets</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            user-select: none;
+        }
+        #scene-container {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            z-index: 10;
+        }
+        #controls button, #controls input, #controls select {
+            margin: 5px;
+            padding: 5px;
+            border-radius: 3px;
+            border: none;
+            cursor: pointer;
+        }
+        #controls button {
+            background: #0088ff;
+            color: white;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        #controls button:hover {
+            background: #0066cc;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            max-width: 300px;
+            z-index: 10;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid #0088ff;
+        }
+        #tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 5px;
+            border-radius: 3px;
+            pointer-events: none;
+            z-index: 20;
+            display: none;
+            border: 1px solid #ffcc00;
+            color: #ffcc00;
+            font-weight: bold;
+        }
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+        }
+        #loading h2 {
+            color: #0088ff;
+            text-shadow: 0 0 10px #0088ff;
+        }
+        #loading-progress {
+            width: 300px;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 1px solid #0088ff;
+        }
+        #loading-bar {
+            width: 0%;
+            height: 100%;
+            background: #0088ff;
+            border-radius: 10px;
+            transition: width 0.3s;
+        }
+        .educational-panel {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            max-width: 300px;
+            z-index: 10;
+            display: none;
+            border: 1px solid #0088ff;
+        }
+        .educational-panel h3 {
+            margin-top: 0;
+            color: #0088ff;
+        }
+        .educational-panel button {
+            margin-top: 10px;
+            padding: 5px;
+            border-radius: 3px;
+            border: none;
+            cursor: pointer;
+            background: #0088ff;
+            color: white;
+        }
+        .stats {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+        .speed-indicator {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10;
+            text-align: center;
+            border: 1px solid #0088ff;
+        }
+        .speed-indicator h3 {
+            margin: 0 0 5px 0;
+            color: #0088ff;
+        }
+        .planet-label {
+            color: #ffcc00;
+            font-weight: bold;
+            text-shadow: 0 0 5px #000;
+        }
+        h3 {
+            color: #0088ff;
+            border-bottom: 1px solid #0088ff;
+            padding-bottom: 5px;
+        }
+        strong {
+            color: #ffcc00;
+        }
+        #language-selector {
+            position: absolute;
+            top: 10px;
+            right: 320px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10;
+            border: 1px solid #0088ff;
+        }
+        #language-selector button {
+            margin: 0 5px;
+            padding: 5px 10px;
+            border-radius: 3px;
+            border: none;
+            cursor: pointer;
+            background: #555;
+            color: white;
+            font-weight: bold;
+        }
+        #language-selector button.active {
+            background: #0088ff;
+        }
+        @media (max-width: 768px) {
+            #controls, #info {
+                max-width: 80%;
+                font-size: 14px;
+            }
+            #controls button, #controls input, #controls select {
+                font-size: 12px;
+            }
+            #language-selector {
+                top: auto;
+                bottom: 60px;
+                right: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <h2 id="loading-text">Loading Solar System...</h2>
+        <div id="loading-progress">
+            <div id="loading-bar"></div>
+        </div>
+    </div>
+    <div id="scene-container"></div>
+    <div id="controls">
+        <button onclick="togglePause()" id="pause-btn">Pause</button>
+        <button onclick="resetView()" id="reset-btn">Reset View</button>
+        <button onclick="toggleOrbits()" id="orbits-btn">Toggle Orbits</button>
+        <button onclick="toggleViewMode()" id="view-btn">Switch to 2D</button>
+        <button onclick="toggleLabels()" id="labels-btn">Hide Labels</button>
+        <button onclick="toggleEducationalPanel()" id="edu-btn">Educational Info</button>
+        <div>
+            <span id="speed-label">Speed:</span> <input type="range" id="speed" min="0" max="2" step="0.1" value="1">
+        </div>
+        <div>
+            <span id="system-label">System:</span> 
+            <select id="systemSelect" onchange="switchSystem()">
+                <option value="solar">Solar System</option>
+                <option value="toi2537">TOI-2537 System</option>
+                <option value="gj2126">GJ 2126 System</option>
+                <option value="trappist1">TRAPPIST-1 System</option>
+                <option value="kepler90">Kepler-90 System</option>
+                <option value="hd10180">HD 10180 System</option>
+            </select>
+        </div>
+        <div>
+            <span id="focus-label">Focus:</span> 
+            <select id="focusSelect" onchange="focusPlanet()">
+                <option value="">Select Planet</option>
+            </select>
+        </div>
+    </div>
+    <div id="language-selector">
+        <button onclick="changeLanguage('en')" class="active" id="en-btn">English</button>
+        <button onclick="changeLanguage('bn')" id="bn-btn">বাংলা</button>
+    </div>
+    <div id="info">Click a planet or star for details. Hover for labels.</div>
+    <div id="tooltip"></div>
+    <div class="educational-panel" id="educationalPanel">
+        <h3 id="edu-title">Solar System Facts</h3>
+        <div id="educationalContent">
+            Select a system to learn more about it.
+        </div>
+        <button onclick="toggleEducationalPanel()" id="close-edu-btn">Close</button>
+    </div>
+    <div class="speed-indicator" id="speedIndicator">
+        <h3 id="sim-speed-title">Simulation Speed</h3>
+        <div id="speedDetails">1x - Real time scaled by 1:1,000,000</div>
+    </div>
+    <div class="stats" id="stats"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.167.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.167.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        // Fixed Stats import
+        import Stats from 'https://cdn.jsdelivr.net/npm/three@0.167.0/examples/jsm/libs/stats.module.js';
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        document.getElementById('scene-container').appendChild(renderer.domElement);
+
+        // Stats
+        const stats = new Stats();
+        document.getElementById('stats').appendChild(stats.dom);
+
+        // Post-processing
+        const composer = new EffectComposer(renderer);
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
+
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.7,  // strength - increased for more vibrant effect
+            0.4,  // radius
+            0.85  // threshold
+        );
+        composer.addPass(bloomPass);
+
+        // Orbit controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxDistance = 300;
+        controls.autoRotate = false;
+        controls.autoRotateSpeed = 0.5;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xffffff, 2, 1000);
+        pointLight.position.set(0, 0, 0); // Position light at the star
+        scene.add(pointLight);
+
+        // Starfield
+        const starGeometry = new THREE.BufferGeometry();
+        const starMaterial = new THREE.PointsMaterial({ 
+            color: 0xffffff, 
+            size: 0.1,
+            transparent: true,
+            opacity: 0.8,
+            sizeAttenuation: true
+        });
+        const starVertices = [];
+        for (let i = 0; i < 10000; i++) {
+            const x = (Math.random() - 0.5) * 2000;
+            const y = (Math.random() - 0.5) * 2000;
+            const z = (Math.random() - 0.5) * 2000;
+            starVertices.push(x, y, z);
+        }
+        starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
+
+        // Texture loader
+        const textureLoader = new THREE.TextureLoader();
+        
+        // Load enhanced planet textures with detailed world maps and environmental features
+        const textures = {
+            sun: 'sun_enhanced.jpg',
+            mercury: 'mercury_enhanced.jpg',
+            venus: 'venus_enhanced.jpg',
+            earth: 'earth_enhanced.jpg',
+            mars: 'mars_enhanced.jpg',
+            jupiter: 'jupiter_enhanced.jpg',
+            saturn: 'saturn_enhanced.jpg',
+            saturnRings: 'saturnRings_enhanced.png',
+            uranus: 'uranus_enhanced.jpg',
+            neptune: 'neptune_enhanced.jpg',
+            redStar: 'redStar_enhanced.jpg',
+            orangeStar: 'orangeStar_enhanced.jpg',
+            exoplanet1: 'exoplanet1_enhanced.jpg',
+            exoplanet2: 'exoplanet2_enhanced.jpg',
+            exoplanet3: 'exoplanet3_enhanced.jpg'
+        };
+
+        // Create materials with textures
+        const materials = {};
+        
+        // Day-Night shader for planets
+        const dayNightVertexShader = `
+            varying vec2 vUv;
+            varying vec3 vNormal;
+            varying vec3 vSunDir;
+            
+            uniform vec3 sunPosition;
+            
+            void main() {
+                vUv = uv;
+                vNormal = normalize(normalMatrix * normal);
+                vSunDir = normalize(sunPosition);
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `;
+        
+        const dayNightFragmentShader = `
+            uniform sampler2D dayTexture;
+            uniform float ambientLight;
+            
+            varying vec2 vUv;
+            varying vec3 vNormal;
+            varying vec3 vSunDir;
+            
+            void main() {
+                // Calculate day-night transition
+                float intensity = max(0.0, dot(vNormal, vSunDir));
+                
+                // Add ambient light to night side
+                intensity = max(intensity, ambientLight);
+                
+                // Get texture color
+                vec4 dayColor = texture2D(dayTexture, vUv);
+                
+                // Darken for night side
+                vec4 nightColor = dayColor * vec4(0.3, 0.3, 0.4, 1.0);
+                
+                // Mix day and night based on light intensity
+                vec4 finalColor = mix(nightColor, dayColor, intensity);
+                
+                gl_FragColor = finalColor;
+            }
+        `;
+        
+        // Fallback materials in case textures fail to load
+        const fallbackMaterials = {
+            // Star materials (using MeshBasicMaterial for self-illumination)
+            sun: new THREE.MeshBasicMaterial({ color: 0xffdd00 }),
+            redStar: new THREE.MeshBasicMaterial({ color: 0xff3300 }),
+            orangeStar: new THREE.MeshBasicMaterial({ color: 0xffa500 }),
+            
+            // Planet materials (using MeshPhongMaterial for light reflection) - More vibrant colors
+            mercury: new THREE.MeshPhongMaterial({ color: 0xd3d3d3, shininess: 60 }), // Light gray with shine
+            venus: new THREE.MeshPhongMaterial({ color: 0xffd700, shininess: 40 }), // Gold
+            earth: new THREE.MeshPhongMaterial({ color: 0x00bfff, shininess: 70 }), // Deep sky blue
+            mars: new THREE.MeshPhongMaterial({ color: 0xff4500, shininess: 50 }), // Orange red
+            jupiter: new THREE.MeshPhongMaterial({ color: 0xffa07a, shininess: 30 }), // Light salmon
+            saturn: new THREE.MeshPhongMaterial({ color: 0xffd700, shininess: 40 }), // Gold
+            uranus: new THREE.MeshPhongMaterial({ color: 0x40e0d0, shininess: 60 }), // Turquoise
+            neptune: new THREE.MeshPhongMaterial({ color: 0x1e90ff, shininess: 70 }), // Dodger blue
+            exoplanet1: new THREE.MeshPhongMaterial({ color: 0x32cd32, shininess: 50 }), // Lime green
+            exoplanet2: new THREE.MeshPhongMaterial({ color: 0xda70d6, shininess: 60 }), // Orchid
+            exoplanet3: new THREE.MeshPhongMaterial({ color: 0xff6347, shininess: 50 }), // Tomato
+            
+            // Saturn rings - More vibrant
+            saturnRings: new THREE.MeshBasicMaterial({ 
+                color: 0xffd700, 
+                transparent: true, 
+                opacity: 0.7, 
+                side: THREE.DoubleSide 
+            })
+        };
+
+        // Load textures and create materials
+        let texturesLoaded = 0;
+        const totalTextures = Object.keys(textures).length;
+        
+        for (const [name, url] of Object.entries(textures)) {
+            textureLoader.load(
+                url,
+                (texture) => {
+                    if (name === 'saturnRings') {
+                        materials[name] = new THREE.MeshBasicMaterial({
+                            map: texture,
+                            transparent: true,
+                            opacity: 0.9,
+                            side: THREE.DoubleSide
+                        });
+                    } else if (name.includes('Star') || name === 'sun') {
+                        materials[name] = new THREE.MeshBasicMaterial({
+                            map: texture,
+                            emissive: name === 'sun' ? 0xffdd00 : name === 'redStar' ? 0xff3300 : 0xffa500,
+                            emissiveIntensity: 0.5
+                        });
+                    } else {
+                        // Create day-night shader material for planets
+                        materials[name] = new THREE.ShaderMaterial({
+                            uniforms: {
+                                dayTexture: { value: texture },
+                                sunPosition: { value: new THREE.Vector3(0, 0, 0) },
+                                ambientLight: { value: 0.2 } // Ambient light for night side
+                            },
+                            vertexShader: dayNightVertexShader,
+                            fragmentShader: dayNightFragmentShader
+                        });
+                    }
+                    
+                    texturesLoaded++;
+                    updateLoadingProgress(texturesLoaded / totalTextures);
+                    
+                    if (texturesLoaded === totalTextures) {
+                        finishLoading();
+                    }
+                },
+                undefined,
+                (error) => {
+                    console.error(`Error loading texture for ${name}:`, error);
+                    materials[name] = fallbackMaterials[name];
+                    
+                    texturesLoaded++;
+                    updateLoadingProgress(texturesLoaded / totalTextures);
+                    
+                    if (texturesLoaded === totalTextures) {
+                        finishLoading();
+                    }
+                }
+            );
+        }
+
+        function updateLoadingProgress(progress) {
+            const loadingBar = document.getElementById('loading-bar');
+            loadingBar.style.width = `${progress * 100}%`;
+        }
+
+        function finishLoading() {
+            loadSystem(currentSystem);
+            document.getElementById('loading').style.display = 'none';
+            loadingComplete = true;
+        }
+
+        // System data with speed details
+        const systems = {
+            solar: {
+                star: {
+                    name: 'Sun',
+                    radius: 10,
+                    color: 0xffd700,
+                    info: 'The Sun is the star at the center of the Solar System. It is a nearly perfect sphere of hot plasma, heated to incandescence by nuclear fusion reactions in its core, radiating the energy mainly as visible light, ultraviolet light, and infrared radiation.',
+                    position: [0, 0, 0],
+                    mass: '1.989 × 10³⁰ kg',
+                    temperature: '5,778 K (surface)',
+                    material: 'sun'
+                },
+                planets: [
+                    { 
+                        name: 'Mercury', 
+                        radius: 2, 
+                        distance: 20, 
+                        speed: 0.04, 
+                        color: 0xd3d3d3, 
+                        info: 'Mercury is the smallest and innermost planet in the Solar System. Its orbit around the Sun takes 87.97 Earth days, the shortest of all the planets.', 
+                        mass: '3.30 × 10²³ kg', 
+                        orbitalPeriod: '88 days',
+                        material: 'mercury',
+                        atmosphere: 'Virtually none',
+                        surfaceTemp: '-173°C to 427°C',
+                        realSpeed: '47.4 km/s'
+                    },
+                    { 
+                        name: 'Venus', 
+                        radius: 3, 
+                        distance: 30, 
+                        speed: 0.015, 
+                        color: 0xffd700, 
+                        info: 'Venus is the second planet from the Sun. It is named after the Roman goddess of love and beauty. As the brightest natural object in Earth\'s night sky after the Moon, Venus can cast shadows and can be visible to the naked eye in broad daylight.', 
+                        mass: '4.87 × 10²⁴ kg', 
+                        orbitalPeriod: '225 days',
+                        material: 'venus',
+                        atmosphere: 'Thick CO₂, sulfuric acid clouds',
+                        surfaceTemp: '462°C (hottest in solar system)',
+                        realSpeed: '35.0 km/s'
+                    },
+                    { 
+                        name: 'Earth', 
+                        radius: 4, 
+                        distance: 40, 
+                        speed: 0.01, 
+                        color: 0x00bfff, 
+                        info: 'Earth is the third planet from the Sun and the only astronomical object known to harbor life. About 71% of Earth\'s surface is covered with water. Earth\'s atmosphere consists of nitrogen (78%), oxygen (21%), argon (0.9%) and carbon dioxide (0.04%).', 
+                        mass: '5.97 × 10²⁴ kg', 
+                        orbitalPeriod: '365.25 days', 
+                        habitable: true,
+                        material: 'earth',
+                        atmosphere: 'Nitrogen, Oxygen, Argon',
+                        surfaceTemp: '-88°C to 58°C',
+                        moons: 1,
+                        realSpeed: '29.8 km/s'
+                    },
+                    { 
+                        name: 'Mars', 
+                        radius: 3, 
+                        distance: 50, 
+                        speed: 0.008, 
+                        color: 0xff4500, 
+                        info: 'Mars is the fourth planet from the Sun and the second-smallest planet in the Solar System, being larger than only Mercury. Mars is often referred to as the "Red Planet" because of its reddish appearance.', 
+                        mass: '6.42 × 10²³ kg', 
+                        orbitalPeriod: '687 days',
+                        material: 'mars',
+                        atmosphere: 'Thin CO₂',
+                        surfaceTemp: '-153°C to 20°C',
+                        moons: 2,
+                        realSpeed: '24.1 km/s'
+                    },
+                    { 
+                        name: 'Jupiter', 
+                        radius: 8, 
+                        distance: 70, 
+                        speed: 0.004, 
+                        color: 0xffa07a, 
+                        info: 'Jupiter is the fifth planet from the Sun and the largest in the Solar System. It is a gas giant with a mass more than two and a half times that of all the other planets in the Solar System combined, but slightly less than one-thousandth the mass of the Sun.', 
+                        mass: '1.90 × 10²⁷ kg', 
+                        orbitalPeriod: '11.86 years',
+                        material: 'jupiter',
+                        atmosphere: 'Hydrogen, Helium',
+                        surfaceTemp: '-108°C (cloud top)',
+                        moons: 79,
+                        realSpeed: '13.1 km/s'
+                    },
+                    { 
+                        name: 'Saturn', 
+                        radius: 7, 
+                        distance: 90, 
+                        speed: 0.003, 
+                        color: 0xffd700, 
+                        info: 'Saturn is the sixth planet from the Sun and the second-largest in the Solar System, after Jupiter. It is a gas giant with an average radius of about nine and a half times that of Earth. It has only one-eighth the average density of Earth.', 
+                        mass: '5.68 × 10²⁶ kg', 
+                        orbitalPeriod: '29.46 years',
+                        material: 'saturn',
+                        hasRings: true,
+                        atmosphere: 'Hydrogen, Helium',
+                        surfaceTemp: '-139°C (cloud top)',
+                        moons: 82,
+                        realSpeed: '9.7 km/s'
+                    },
+                    { 
+                        name: 'Uranus', 
+                        radius: 6, 
+                        distance: 110, 
+                        speed: 0.002, 
+                        color: 0x40e0d0, 
+                        info: 'Uranus is the seventh planet from the Sun. Its name is a reference to the Greek god of the sky, Uranus, who, according to Greek mythology, was the grandfather of Zeus (Jupiter) and father of Cronus (Saturn).', 
+                        mass: '8.68 × 10²⁵ kg', 
+                        orbitalPeriod: '84 years',
+                        material: 'uranus',
+                        atmosphere: 'Hydrogen, Helium, Methane',
+                        surfaceTemp: '-197°C',
+                        moons: 27,
+                        axialTilt: 98,
+                        realSpeed: '6.8 km/s'
+                    },
+                    { 
+                        name: 'Neptune', 
+                        radius: 6, 
+                        distance: 130, 
+                        speed: 0.0015, 
+                        color: 0x1e90ff, 
+                        info: 'Neptune is the eighth and farthest-known Solar planet from the Sun. In the Solar System, it is the fourth-largest planet by diameter, the third-most-massive planet, and the densest giant planet.', 
+                        mass: '1.02 × 10²⁶ kg', 
+                        orbitalPeriod: '164.8 years',
+                        material: 'neptune',
+                        atmosphere: 'Hydrogen, Helium, Methane',
+                        surfaceTemp: '-201°C',
+                        moons: 14,
+                        realSpeed: '5.4 km/s'
+                    }
+                ]
+            },
+            toi2537: {
+                star: {
+                    name: 'TOI-2537',
+                    radius: 8,
+                    color: 0xffa500,
+                    info: 'TOI-2537 is a host star observed by the Transiting Exoplanet Survey Satellite (TESS). It is a K-type star with a temperature cooler than our Sun.',
+                    position: [0, 0, 0],
+                    mass: '0.85 M☉',
+                    temperature: '4,600 K',
+                    material: 'orangeStar'
+                },
+                planets: [
+                    { 
+                        name: 'TOI-2537 b', 
+                        radius: 4, 
+                        distance: 25, 
+                        speed: 0.02, 
+                        color: 0x32cd32, 
+                        info: 'TOI-2537 b is an exoplanet orbiting within the habitable zone of its star. It was discovered by TESS in 2025 and is considered a potential candidate for hosting liquid water.', 
+                        mass: '2.1 Earth masses (estimated)', 
+                        orbitalPeriod: '14.2 days', 
+                        habitable: true,
+                        material: 'exoplanet1',
+                        realSpeed: '~120 km/s (estimated)'
+                    },
+                    { 
+                        name: 'TOI-2537 c', 
+                        radius: 3, 
+                        distance: 35, 
+                        speed: 0.015, 
+                        color: 0xda70d6, 
+                        info: 'TOI-2537 c is a sub-Neptune exoplanet discovered as part of the TESS mission. It has a thicker atmosphere than Earth and orbits outside the habitable zone.', 
+                        mass: '5.3 Earth masses (estimated)', 
+                        orbitalPeriod: '20.7 days',
+                        material: 'exoplanet2',
+                        realSpeed: '~100 km/s (estimated)'
+                    }
+                ]
+            },
+            gj2126: {
+                star: {
+                    name: 'GJ 2126',
+                    radius: 6,
+                    color: 0xff4500,
+                    info: 'GJ 2126 is a cool M-dwarf star located approximately 42 light-years from Earth. It has about 40% the mass of our Sun and is much cooler.',
+                    position: [0, 0, 0],
+                    mass: '0.4 M☉',
+                    temperature: '3,200 K',
+                    material: 'redStar'
+                },
+                planets: [
+                    { 
+                        name: 'GJ 2126 b', 
+                        radius: 5, 
+                        distance: 30, 
+                        speed: 0.01, 
+                        color: 0xff6347, 
+                        info: 'GJ 2126 b is an exoplanet with a highly eccentric orbit discovered in 2025. The eccentric orbit causes extreme seasonal variations, making it an interesting target for atmospheric studies.', 
+                        mass: '7.2 Earth masses (estimated)', 
+                        orbitalPeriod: '30.5 days', 
+                        eccentric: 0.7,
+                        material: 'exoplanet3',
+                        realSpeed: 'Variable: 30-90 km/s due to eccentric orbit'
+                    }
+                ]
+            },
+            trappist1: {
+                star: {
+                    name: 'TRAPPIST-1',
+                    radius: 5,
+                    color: 0xff3300,
+                    info: 'TRAPPIST-1 is an ultra-cool red dwarf star located 39.6 light-years from Earth. It hosts a system of seven known exoplanets, the largest number found in a planetary system outside our own.',
+                    position: [0, 0, 0],
+                    mass: '0.089 M☉',
+                    temperature: '2,566 K',
+                    material: 'redStar'
+                },
+                planets: [
+                    { name: 'TRAPPIST-1 b', radius: 2.5, distance: 15, speed: 0.05, color: 0xd3d3d3, info: 'TRAPPIST-1 b is the innermost planet in the system, completing an orbit in just 1.51 days.', mass: '1.02 Earth masses', orbitalPeriod: '1.51 days', material: 'mercury', realSpeed: '~80 km/s' },
+                    { name: 'TRAPPIST-1 c', radius: 2.6, distance: 20, speed: 0.04, color: 0xffd700, info: 'TRAPPIST-1 c is the second planet from the star.', mass: '1.16 Earth masses', orbitalPeriod: '2.42 days', material: 'venus', realSpeed: '~70 km/s' },
+                    { name: 'TRAPPIST-1 d', radius: 2.8, distance: 25, speed: 0.03, color: 0xff4500, info: 'TRAPPIST-1 d is the third planet from the star.', mass: '0.3 Earth masses', orbitalPeriod: '4.05 days', material: 'mars', realSpeed: '~60 km/s' },
+                    { name: 'TRAPPIST-1 e', radius: 3.0, distance: 30, speed: 0.025, color: 0x00bfff, info: 'TRAPPIST-1 e is considered the most likely to be habitable, with conditions potentially suitable for liquid water.', mass: '0.77 Earth masses', orbitalPeriod: '6.1 days', habitable: true, material: 'earth', realSpeed: '~50 km/s' },
+                    { name: 'TRAPPIST-1 f', radius: 3.1, distance: 35, speed: 0.02, color: 0x32cd32, info: 'TRAPPIST-1 f is the fifth planet from the star.', mass: '0.93 Earth masses', orbitalPeriod: '9.21 days', material: 'exoplanet1', realSpeed: '~45 km/s' },
+                    { name: 'TRAPPIST-1 g', radius: 3.2, distance: 40, speed: 0.015, color: 0xda70d6, info: 'TRAPPIST-1 g is the sixth planet from the star.', mass: '1.15 Earth masses', orbitalPeriod: '12.35 days', material: 'exoplanet2', realSpeed: '~40 km/s' },
+                    { name: 'TRAPPIST-1 h', radius: 2.5, distance: 45, speed: 0.01, color: 0xff6347, info: 'TRAPPIST-1 h is the outermost known planet in the system.', mass: '0.33 Earth masses', orbitalPeriod: '18.77 days', material: 'exoplanet3', realSpeed: '~35 km/s' }
+                ]
+            },
+            kepler90: {
+                star: {
+                    name: 'Kepler-90',
+                    radius: 9,
+                    color: 0xffdd00,
+                    info: 'Kepler-90 is a G-type main sequence star located about 2,840 light-years from Earth. It hosts a planetary system with eight confirmed planets, making it one of the few known systems with as many planets as our Solar System.',
+                    position: [0, 0, 0],
+                    mass: '1.2 M☉',
+                    temperature: '6,080 K',
+                    material: 'sun'
+                },
+                planets: [
+                    { name: 'Kepler-90 b', radius: 2.5, distance: 15, speed: 0.05, color: 0xd3d3d3, info: 'Kepler-90 b is the innermost planet in the system.', mass: '2.3 Earth masses', orbitalPeriod: '7.0 days', material: 'mercury', realSpeed: '~100 km/s' },
+                    { name: 'Kepler-90 c', radius: 2.8, distance: 20, speed: 0.04, color: 0xffd700, info: 'Kepler-90 c is the second planet from the star.', mass: '1.8 Earth masses', orbitalPeriod: '8.7 days', material: 'venus', realSpeed: '~90 km/s' },
+                    { name: 'Kepler-90 i', radius: 2.0, distance: 25, speed: 0.035, color: 0xff4500, info: 'Kepler-90 i was discovered using machine learning techniques applied to Kepler data.', mass: '2.2 Earth masses', orbitalPeriod: '14.4 days', material: 'mars', realSpeed: '~80 km/s' },
+                    { name: 'Kepler-90 d', radius: 3.0, distance: 30, speed: 0.03, color: 0x00bfff, info: 'Kepler-90 d is the fourth planet from the star.', mass: '7 Earth masses', orbitalPeriod: '59.7 days', material: 'earth', realSpeed: '~60 km/s' },
+                    { name: 'Kepler-90 e', radius: 3.5, distance: 40, speed: 0.02, color: 0x32cd32, info: 'Kepler-90 e is the fifth planet from the star.', mass: '8 Earth masses', orbitalPeriod: '91.9 days', material: 'exoplanet1', realSpeed: '~50 km/s' },
+                    { name: 'Kepler-90 f', radius: 4.5, distance: 50, speed: 0.015, color: 0xda70d6, info: 'Kepler-90 f is the sixth planet from the star.', mass: '9 Earth masses', orbitalPeriod: '124.9 days', material: 'exoplanet2', realSpeed: '~45 km/s' },
+                    { name: 'Kepler-90 g', radius: 6.0, distance: 65, speed: 0.01, color: 0xff6347, info: 'Kepler-90 g is the seventh planet from the star.', mass: '11 Earth masses', orbitalPeriod: '210.6 days', material: 'exoplanet3', realSpeed: '~40 km/s' },
+                    { name: 'Kepler-90 h', radius: 7.0, distance: 80, speed: 0.008, color: 0xffa07a, info: 'Kepler-90 h is the outermost known planet in the system.', mass: '0.1 Jupiter masses', orbitalPeriod: '331.6 days', material: 'jupiter', realSpeed: '~35 km/s' }
+                ]
+            },
+            hd10180: {
+                star: {
+                    name: 'HD 10180',
+                    radius: 8.5,
+                    color: 0xffcc00,
+                    info: 'HD 10180 is a Sun-like star located 127 light-years from Earth in the constellation Hydrus. It hosts a system of at least six confirmed planets, with evidence for up to nine.',
+                    position: [0, 0, 0],
+                    mass: '1.06 M☉',
+                    temperature: '5,911 K',
+                    material: 'sun'
+                },
+                planets: [
+                    { name: 'HD 10180 b', radius: 2.5, distance: 15, speed: 0.05, color: 0xd3d3d3, info: 'HD 10180 b is the innermost confirmed planet in the system.', mass: '1.35 Earth masses', orbitalPeriod: '1.18 days', material: 'mercury', realSpeed: '~110 km/s' },
+                    { name: 'HD 10180 c', radius: 4.0, distance: 25, speed: 0.04, color: 0xffd700, info: 'HD 10180 c is the second planet from the star.', mass: '13.1 Earth masses', orbitalPeriod: '5.76 days', material: 'venus', realSpeed: '~90 km/s' },
+                    { name: 'HD 10180 d', radius: 3.5, distance: 35, speed: 0.03, color: 0xff4500, info: 'HD 10180 d is the third planet from the star.', mass: '11.9 Earth masses', orbitalPeriod: '16.36 days', material: 'mars', realSpeed: '~70 km/s' },
+                    { name: 'HD 10180 e', radius: 4.2, distance: 45, speed: 0.025, color: 0x00bfff, info: 'HD 10180 e is the fourth planet from the star.', mass: '25.4 Earth masses', orbitalPeriod: '49.75 days', material: 'earth', realSpeed: '~60 km/s' },
+                    { name: 'HD 10180 f', radius: 4.5, distance: 60, speed: 0.02, color: 0x32cd32, info: 'HD 10180 f is the fifth planet from the star.', mass: '23.5 Earth masses', orbitalPeriod: '122.76 days', material: 'exoplanet1', realSpeed: '~50 km/s' },
+                    { name: 'HD 10180 g', radius: 5.0, distance: 80, speed: 0.015, color: 0xda70d6, info: 'HD 10180 g is the sixth planet from the star.', mass: '21.4 Earth masses', orbitalPeriod: '602 days', material: 'exoplanet2', realSpeed: '~30 km/s' },
+                    { name: 'HD 10180 h', radius: 6.0, distance: 100, speed: 0.01, color: 0xff6347, info: 'HD 10180 h is the outermost confirmed planet in the system.', mass: '65.8 Earth masses', orbitalPeriod: '2222 days', material: 'exoplanet3', realSpeed: '~20 km/s' }
+                ]
+            }
+        };
+
+        // Educational content with more vibrant formatting
+        const educationalContent = {
+            en: {
+                solar: `
+                    <h3>Our Solar System</h3>
+                    <p>The Solar System formed about <strong>4.6 billion years ago</strong> from the gravitational collapse of a giant interstellar molecular cloud.</p>
+                    <p>It consists of the <strong>Sun</strong> and the objects that orbit it, including <strong>eight planets</strong>, their moons, asteroids, comets, and other small bodies.</p>
+                    <p>The four inner planets (Mercury, Venus, Earth, and Mars) are <strong>terrestrial planets</strong>, being primarily composed of rock and metal.</p>
+                    <p>The four outer planets (Jupiter, Saturn, Uranus, and Neptune) are <strong>giant planets</strong>, being substantially more massive than the terrestrials.</p>
+                    <p>The Solar System also contains smaller objects, including the <strong>asteroid belt</strong>, <strong>Kuiper belt</strong>, and the <strong>Oort cloud</strong>.</p>
+                `,
+                toi2537: `
+                    <h3>TOI-2537 System</h3>
+                    <p>TOI-2537 is a star system discovered by NASA's <strong>Transiting Exoplanet Survey Satellite (TESS)</strong>.</p>
+                    <p>The system contains at least <strong>two confirmed exoplanets</strong>, with TOI-2537 b potentially located in the <strong>habitable zone</strong>.</p>
+                    <p>TOI-2537 b is particularly interesting to astronomers due to its potential to host <strong>liquid water</strong> on its surface.</p>
+                    <p>The star is a <strong>K-type star</strong>, cooler and smaller than our Sun, which affects the location of its habitable zone.</p>
+                `,
+                gj2126: `
+                    <h3>GJ 2126 System</h3>
+                    <p>GJ 2126 is a <strong>red dwarf star</strong> system with at least one confirmed exoplanet.</p>
+                    <p>GJ 2126 b has a <strong>highly eccentric orbit</strong>, which means its distance from its star varies significantly during its orbit.</p>
+                    <p>This eccentric orbit causes <strong>extreme seasonal variations</strong> on the planet, making it an interesting target for atmospheric studies.</p>
+                    <p><strong>Red dwarf stars</strong> like GJ 2126 are the most common type of star in our galaxy, making them important targets in the search for exoplanets.</p>
+                `,
+                trappist1: `
+                    <h3>TRAPPIST-1 System</h3>
+                    <p>TRAPPIST-1 is a planetary system located <strong>39.6 light-years</strong> from Earth in the constellation Aquarius.</p>
+                    <p>The system consists of an <strong>ultra-cool red dwarf star</strong> with <strong>seven confirmed Earth-sized planets</strong>, named TRAPPIST-1b through h.</p>
+                    <p>Three of these planets (e, f, and g) are located within the star's <strong>habitable zone</strong>, where conditions might be right for liquid water.</p>
+                    <p>The TRAPPIST-1 planets are so close to each other that an observer standing on one planet's surface could see the neighboring planets appearing <strong>larger than the Moon</strong> in Earth's sky.</p>
+                    <p>All seven planets are likely <strong>tidally locked</strong>, meaning the same side always faces the star, resulting in permanent day and night sides.</p>
+                `,
+                kepler90: `
+                    <h3>Kepler-90 System</h3>
+                    <p>Kepler-90 is a Sun-like star located about <strong>2,840 light-years</strong> from Earth in the constellation Draco.</p>
+                    <p>With <strong>eight confirmed planets</strong>, Kepler-90 was the first exoplanetary system found to have as many planets as our Solar System.</p>
+                    <p>The planets are named Kepler-90b through Kepler-90h, plus Kepler-90i which was discovered using <strong>machine learning techniques</strong> applied to Kepler data.</p>
+                    <p>All of the planets orbit closer to their star than Earth does to the Sun, with the entire system fitting within Earth's orbit.</p>
+                    <p>The discovery of Kepler-90i in 2017 demonstrated the effectiveness of using <strong>artificial intelligence</strong> to identify exoplanets in astronomical data.</p>
+                `,
+                hd10180: `
+                    <h3>HD 10180 System</h3>
+                    <p>HD 10180 is a Sun-like star located <strong>127 light-years</strong> from Earth in the constellation Hydrus.</p>
+                    <p>The system has at least <strong>six confirmed planets</strong>, with evidence suggesting there could be up to nine, potentially making it one of the largest known exoplanetary systems.</p>
+                    <p>The planets range from <strong>super-Earths to Neptune-sized bodies</strong>, with masses between 1.3 and 65 Earth masses.</p>
+                    <p>The system shows remarkable <strong>regularity in the spacing</strong> of its planets, similar to the Titius–Bode law observed in our Solar System.</p>
+                    <p>HD 10180 was discovered using the <strong>HARPS spectrograph</strong> on the European Southern Observatory's 3.6m telescope in Chile.</p>
+                `
+            },
+            bn: {
+                solar: `
+                    <h3>আমাদের সৌরজগৎ</h3>
+                    <p>সৌরজগৎ প্রায় <strong>৪.৬ বিলিয়ন বছর আগে</strong> একটি বিশাল আন্তঃনক্ষত্রীয় আণবিক মেঘের মাধ্যাকর্ষণীয় পতনের ফলে গঠিত হয়েছিল।</p>
+                    <p>এটি <strong>সূর্য</strong> এবং এর চারপাশে ঘুরে বেড়ানো বস্তুগুলি নিয়ে গঠিত, যার মধ্যে রয়েছে <strong>আটটি গ্রহ</strong>, তাদের চাঁদ, গ্রহাণু, ধূমকেতু এবং অন্যান্য ছোট বস্তু।</p>
+                    <p>চারটি অভ্যন্তরীণ গ্রহ (বুধ, শুক্র, পৃথিবী এবং মঙ্গল) হল <strong>পার্থিব গ্রহ</strong>, যা প্রধানত শিলা ও ধাতু দিয়ে গঠিত।</p>
+                    <p>চারটি বাহ্যিক গ্রহ (বৃহস্পতি, শনি, ইউরেনাস এবং নেপচুন) হল <strong>বৃহৎ গ্রহ</strong>, যা পার্থিব গ্রহের তুলনায় যথেষ্ট বেশি ভারী।</p>
+                    <p>সৌরজগতে আরও ছোট বস্তু রয়েছে, যার মধ্যে রয়েছে <strong>গ্রহাণু বেল্ট</strong>, <strong>কুইপার বেল্ট</strong>, এবং <strong>ওর্ট ক্লাউড</strong>।</p>
+                `,
+                toi2537: `
+                    <h3>TOI-2537 সিস্টেম</h3>
+                    <p>TOI-2537 হল নাসার <strong>ট্রানজিটিং এক্সোপ্ল্যানেট সার্ভে স্যাটেলাইট (TESS)</strong> দ্বারা আবিষ্কৃত একটি নক্ষত্র সিস্টেম।</p>
+                    <p>এই সিস্টেমে কমপক্ষে <strong>দুটি নিশ্চিত এক্সোপ্ল্যানেট</strong> রয়েছে, যার মধ্যে TOI-2537 b সম্ভাব্যভাবে <strong>বাসযোগ্য অঞ্চলে</strong> অবস্থিত।</p>
+                    <p>TOI-2537 b জ্যোতির্বিদদের কাছে বিশেষভাবে আকর্ষণীয় কারণ এর পৃষ্ঠে <strong>তরল জল</strong> থাকার সম্ভাবনা রয়েছে।</p>
+                    <p>এই নক্ষত্রটি একটি <strong>K-টাইপ স্টার</strong>, আমাদের সূর্যের তুলনায় ঠান্ডা এবং ছোট, যা এর বাসযোগ্য অঞ্চলের অবস্থানকে প্রভাবিত করে।</p>
+                `,
+                gj2126: `
+                    <h3>GJ 2126 সিস্টেম</h3>
+                    <p>GJ 2126 হল একটি <strong>লাল বামন নক্ষত্র</strong> সিস্টেম যাতে কমপক্ষে একটি নিশ্চিত এক্সোপ্ল্যানেট রয়েছে।</p>
+                    <p>GJ 2126 b এর একটি <strong>অত্যন্ত উচ্চ কেন্দ্রিক কক্ষপথ</strong> রয়েছে, যার অর্থ এর কক্ষপথে এর নক্ষত্র থেকে দূরত্ব উল্লেখযোগ্যভাবে পরিবর্তিত হয়।</p>
+                    <p>এই উচ্চ কেন্দ্রিক কক্ষপথ গ্রহে <strong>চরম ঋতু পরিবর্তন</strong> ঘটায়, যা এটিকে বায়ুমণ্ডলীয় গবেষণার জন্য একটি আকর্ষণীয় লক্ষ্য করে তোলে।</p>
+                    <p>GJ 2126 এর মতো <strong>লাল বামন নক্ষত্র</strong> আমাদের গ্যালাক্সিতে সবচেয়ে সাধারণ ধরনের নক্ষত্র, যা তাদেরকে এক্সোপ্ল্যানেট অনুসন্ধানে গুরুত্বপূর্ণ লক্ষ্য করে তোলে।</p>
+                `,
+                trappist1: `
+                    <h3>TRAPPIST-1 সিস্টেম</h3>
+                    <p>TRAPPIST-1 হল একটি গ্রহ সিস্টেম যা পৃথিবী থেকে <strong>৩৯.৬ আলোকবর্ষ</strong> দূরে অ্যাকোয়ারিয়াস নক্ষত্রমণ্ডলে অবস্থিত।</p>
+                    <p>এই সিস্টেমে একটি <strong>অতি-শীতল লাল বামন নক্ষত্র</strong> রয়েছে যার <strong>সাতটি নিশ্চিত পৃথিবীর আকারের গ্রহ</strong> রয়েছে, যাদের নাম TRAPPIST-1b থেকে h।</p>
+                    <p>এই গ্রহগুলির মধ্যে তিনটি (e, f, এবং g) নক্ষত্রের <strong>বাসযোগ্য অঞ্চলে</strong> অবস্থিত, যেখানে তরল জলের জন্য অবস্থা উপযুক্ত হতে পারে।</p>
+                    <p>TRAPPIST-1 গ্রহগুলি একে অপরের এত কাছাকাছি যে একটি গ্রহের পৃষ্ঠে দাঁড়িয়ে একজন পর্যবেক্ষক প্রতিবেশী গ্রহগুলিকে পৃথিবীর আকাশে <strong>চাঁদের চেয়েও বড়</strong> দেখতে পাবেন।</p>
+                    <p>সাতটি গ্রহই সম্ভবত <strong>জোয়ারীয়ভাবে আবদ্ধ</strong>, যার অর্থ একই দিক সবসময় নক্ষত্রের দিকে মুখ করে থাকে, যার ফলে স্থায়ী দিন ও রাত্রির দিক তৈরি হয়।</p>
+                `,
+                kepler90: `
+                    <h3>Kepler-90 সিস্টেম</h3>
+                    <p>Kepler-90 হল একটি সূর্যের মতো নক্ষত্র যা পৃথিবী থেকে প্রায় <strong>২,৮৪০ আলোকবর্ষ</strong> দূরে ড্রাকো নক্ষত্রমণ্ডলে অবস্থিত।</p>
+                    <p><strong>আটটি নিশ্চিত গ্রহ</strong> সহ, Kepler-90 ছিল প্রথম এক্সোপ্ল্যানেটারি সিস্টেম যাতে আমাদের সৌরজগতের মতো অনেক গ্রহ পাওয়া গেছে।</p>
+                    <p>গ্রহগুলির নাম Kepler-90b থেকে Kepler-90h, এবং Kepler-90i যা Kepler ডেটাতে <strong>মেশিন লার্নিং টেকনিক</strong> ব্যবহার করে আবিষ্কৃত হয়েছিল।</p>
+                    <p>সমস্ত গ্রহ পৃথিবীর তুলনায় তাদের নক্ষত্রের কাছাকাছি ঘোরে, সমগ্র সিস্টেম পৃথিবীর কক্ষপথের মধ্যে ফিট হয়।</p>
+                    <p>২০১৭ সালে Kepler-90i এর আবিষ্কার জ্যোতির্বিজ্ঞানের তথ্যে এক্সোপ্ল্যানেট চিহ্নিত করতে <strong>কৃত্রিম বুদ্ধিমত্তা</strong> ব্যবহারের কার্যকারিতা প্রদর্শন করেছিল।</p>
+                `,
+                hd10180: `
+                    <h3>HD 10180 সিস্টেম</h3>
+                    <p>HD 10180 হল একটি সূর্যের মতো নক্ষত্র যা পৃথিবী থেকে <strong>১২৭ আলোকবর্ষ</strong> দূরে হাইড্রাস নক্ষত্রমণ্ডলে অবস্থিত।</p>
+                    <p>এই সিস্টেমে কমপক্ষে <strong>ছয়টি নিশ্চিত গ্রহ</strong> রয়েছে, এবং প্রমাণ সাজেস্ট করে যে নয়টি পর্যন্ত থাকতে পারে, যা এটিকে সম্ভবত সবচেয়ে বড় পরিচিত এক্সোপ্ল্যানেটারি সিস্টেমগুলির মধ্যে একটি করে তোলে।</p>
+                    <p>গ্রহগুলি <strong>সুপার-আর্থ থেকে নেপচুন-আকারের বডি</strong> পর্যন্ত রয়েছে, যাদের ভর ১.৩ থেকে ৬৫ পৃথিবীর ভরের মধ্যে।</p>
+                    <p>সিস্টেমটি তার গ্রহগুলির <strong>স্পেসিংয়ে উল্লেখযোগ্য নিয়মিততা</strong> দেখায়, যা আমাদের সৌরজগতে পর্যবেক্ষিত টিটিয়াস-বোড আইনের অনুরূপ।</p>
+                    <p>HD 10180 চিলিতে ইউরোপীয় সাউদার্ন অবজারভেটরির ৩.৬ মিটার টেলিস্কোপে <strong>HARPS স্পেক্ট্রোগ্রাফ</strong> ব্যবহার করে আবিষ্কৃত হয়েছিল।</p>
+                `
+            }
+        };
+
+        // Translation data
+        const translations = {
+            en: {
+                // Loading screen
+                "loading-text": "Loading Solar System...",
+                
+                // Controls
+                "pause-btn": "Pause",
+                "reset-btn": "Reset View",
+                "orbits-btn": "Toggle Orbits",
+                "view-btn": "Switch to 2D",
+                "labels-btn": "Hide Labels",
+                "edu-btn": "Educational Info",
+                "speed-label": "Speed:",
+                "system-label": "System:",
+                "focus-label": "Focus:",
+                "close-edu-btn": "Close",
+                
+                // Info panel default text
+                "info": "Click a planet or star for details. Hover for labels.",
+                
+                // Educational panel
+                "edu-title": "Solar System Facts",
+                
+                // Speed indicator
+                "sim-speed-title": "Simulation Speed",
+                
+                // Planet selection
+                "select-planet": "Select Planet"
+            },
+            bn: {
+                // Loading screen
+                "loading-text": "সৌরজগৎ লোড হচ্ছে...",
+                
+                // Controls
+                "pause-btn": "বিরতি",
+                "reset-btn": "ভিউ রিসেট",
+                "orbits-btn": "কক্ষপথ দেখান/লুকান",
+                "view-btn": "2D তে পরিবর্তন",
+                "labels-btn": "লেবেল লুকান",
+                "edu-btn": "শিক্ষামূলক তথ্য",
+                "speed-label": "গতি:",
+                "system-label": "সিস্টেম:",
+                "focus-label": "ফোকাস:",
+                "close-edu-btn": "বন্ধ করুন",
+                
+                // Info panel default text
+                "info": "বিস্তারিত জানতে গ্রহ বা নক্ষত্রে ক্লিক করুন। লেবেল দেখতে হোভার করুন।",
+                
+                // Educational panel
+                "edu-title": "সৌরজগৎ সম্পর্কে তথ্য",
+                
+                // Speed indicator
+                "sim-speed-title": "সিমুলেশন গতি",
+                
+                // Planet selection
+                "select-planet": "গ্রহ নির্বাচন করুন"
+            }
+        };
+
+        let currentSystem = 'solar';
+        let celestialObjects = [];
+        let orbitPaths = [];
+        let labels = [];
+        let time = 0;
+        let isPaused = false;
+        let speedMultiplier = 1;
+        let showOrbits = true;
+        let showLabels = true;
+        let is2DView = false;
+        let showEducationalPanel = false;
+        let cameraTransitioning = false;
+        let loadingComplete = false;
+        let currentLanguage = 'en';
+
+        // Create celestial object
+        function createCelestialObject(data, isStar = false) {
+            const geometry = new THREE.SphereGeometry(data.radius, 32, 32);
+            let material;
+            
+            if (data.material && materials[data.material]) {
+                material = materials[data.material];
+            } else if (isStar) {
+                material = new THREE.MeshBasicMaterial({ color: data.color });
+            } else {
+                material = new THREE.MeshPhongMaterial({ color: data.color });
+            }
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.userData = { ...data, isStar };
+            
+            // Add rotation
+            if (isStar) {
+                mesh.rotation.x = THREE.MathUtils.degToRad(7); // Slight tilt like the Sun
+            } else if (data.axialTilt) {
+                mesh.rotation.x = THREE.MathUtils.degToRad(data.axialTilt);
+            } else {
+                mesh.rotation.x = THREE.MathUtils.degToRad(Math.random() * 30); // Random tilt for planets
+            }
+            
+            scene.add(mesh);
+
+            // Add rings for Saturn
+            if (data.hasRings && materials.saturnRings) {
+                const ringGeometry = new THREE.RingGeometry(data.radius * 1.4, data.radius * 2.3, 64);
+                const ring = new THREE.Mesh(ringGeometry, materials.saturnRings);
+                ring.rotation.x = THREE.MathUtils.degToRad(90);
+                mesh.add(ring);
+            }
+
+            // Label
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.font = 'bold 20px Arial';
+            ctx.fillStyle = '#ffcc00';
+            ctx.textAlign = 'center';
+            ctx.fillText(data.name, 128, 30);
+            
+            // Add speed if available
+            if (data.realSpeed && !isStar) {
+                ctx.font = '16px Arial';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(data.realSpeed, 128, 50);
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.scale.set(15, 5, 1);
+            sprite.userData = { name: data.name };
+            sprite.visible = showLabels;
+            scene.add(sprite);
+            labels.push(sprite);
+
+            if (!isStar && showOrbits) {
+                const curve = data.eccentric ? new THREE.EllipseCurve(
+                    0, 0, data.distance, data.distance * (1 - data.eccentric), 0, 2 * Math.PI, false, 0
+                ) : new THREE.EllipseCurve(0, 0, data.distance, data.distance, 0, 2 * Math.PI, false, 0);
+                const points = curve.getPoints(100);
+                const orbitGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                
+                // Use planet color for orbit path
+                const orbitColor = data.color;
+                const orbitMaterial = new THREE.LineBasicMaterial({ 
+                    color: orbitColor, 
+                    transparent: true, 
+                    opacity: 0.5,
+                    linewidth: 2 
+                });
+                
+                const orbit = new THREE.Line(orbitGeometry, orbitMaterial);
+                orbit.rotation.x = THREE.MathUtils.degToRad(is2DView ? 0 : 90);
+                scene.add(orbit);
+                orbitPaths.push(orbit);
+            }
+
+            return mesh;
+        }
+
+        // Load system
+        function loadSystem(systemName) {
+            console.log(`Loading system: ${systemName}`);
+            celestialObjects.forEach(obj => scene.remove(obj));
+            orbitPaths.forEach(orbit => scene.remove(orbit));
+            labels.forEach(label => scene.remove(label));
+            celestialObjects = [];
+            orbitPaths = [];
+            labels = [];
+
+            const system = systems[systemName];
+            const star = createCelestialObject(system.star, true);
+            celestialObjects.push(star);
+
+            system.planets.forEach(planet => {
+                const planetObj = createCelestialObject(planet);
+                celestialObjects.push(planetObj);
+            });
+
+            // Update focus dropdown
+            const focusSelect = document.getElementById('focusSelect');
+            focusSelect.innerHTML = `<option value="">${translations[currentLanguage]["select-planet"]}</option>`;
+            system.planets.forEach(planet => {
+                const option = document.createElement('option');
+                option.value = planet.name;
+                option.textContent = planet.name;
+                focusSelect.appendChild(option);
+            });
+
+            // Update educational content
+            if (educationalContent[currentLanguage][systemName]) {
+                document.getElementById('educationalContent').innerHTML = educationalContent[currentLanguage][systemName];
+            }
+
+            document.getElementById('info').innerHTML = `<h3>${system.star.name} ${currentLanguage === 'en' ? 'system' : 'সিস্টেম'}</h3><p>${translations[currentLanguage]["info"]}</p>`;
+            
+            // Hide loading screen if not already hidden
+            if (!loadingComplete) {
+                document.getElementById('loading').style.display = 'none';
+                loadingComplete = true;
+            }
+        }
+
+        // Change language
+        window.changeLanguage = function(lang) {
+            currentLanguage = lang;
+            
+            // Update UI elements
+            document.getElementById('loading-text').textContent = translations[lang]["loading-text"];
+            document.getElementById('pause-btn').textContent = translations[lang]["pause-btn"];
+            document.getElementById('reset-btn').textContent = translations[lang]["reset-btn"];
+            document.getElementById('orbits-btn').textContent = translations[lang]["orbits-btn"];
+            document.getElementById('view-btn').textContent = is2DView ? 
+                (lang === 'en' ? 'Switch to 3D' : '3D তে পরিবর্তন') : 
+                translations[lang]["view-btn"];
+            document.getElementById('labels-btn').textContent = showLabels ? 
+                translations[lang]["labels-btn"] : 
+                (lang === 'en' ? 'Show Labels' : 'লেবেল দেখান');
+            document.getElementById('edu-btn').textContent = translations[lang]["edu-btn"];
+            document.getElementById('speed-label').textContent = translations[lang]["speed-label"];
+            document.getElementById('system-label').textContent = translations[lang]["system-label"];
+            document.getElementById('focus-label').textContent = translations[lang]["focus-label"];
+            document.getElementById('close-edu-btn').textContent = translations[lang]["close-edu-btn"];
+            document.getElementById('info').innerHTML = `<h3>${systems[currentSystem].star.name} ${lang === 'en' ? 'system' : 'সিস্টেম'}</h3><p>${translations[lang]["info"]}</p>`;
+            document.getElementById('edu-title').textContent = translations[lang]["edu-title"];
+            document.getElementById('sim-speed-title').textContent = translations[lang]["sim-speed-title"];
+            
+            // Update focus dropdown
+            const focusSelect = document.getElementById('focusSelect');
+            const selectedValue = focusSelect.value;
+            focusSelect.innerHTML = `<option value="">${translations[lang]["select-planet"]}</option>`;
+            systems[currentSystem].planets.forEach(planet => {
+                const option = document.createElement('option');
+                option.value = planet.name;
+                option.textContent = planet.name;
+                focusSelect.appendChild(option);
+            });
+            focusSelect.value = selectedValue;
+            
+            // Update educational content
+            if (educationalContent[lang][currentSystem]) {
+                document.getElementById('educationalContent').innerHTML = educationalContent[lang][currentSystem];
+            }
+            
+            // Update speed indicator
+            updateSpeedIndicator();
+            
+            // Update language buttons
+            document.querySelectorAll('#language-selector button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(`${lang}-btn`).classList.add('active');
+        };
+
+        // Initial load
+        loadSystem(currentSystem);
+        camera.position.set(0, 50, 100);
+        camera.lookAt(0, 0, 0); // Ensure camera is looking at the center
+        controls.target.set(0, 0, 0);
+        controls.update();
+
+        // Update speed indicator
+        function updateSpeedIndicator() {
+            const speedElement = document.getElementById('speedDetails');
+            let speedText = '';
+            
+            if (speedMultiplier === 0) {
+                speedText = currentLanguage === 'en' ? 'Paused' : 'বিরতি';
+            } else if (speedMultiplier < 0.5) {
+                speedText = currentLanguage === 'en' ? 
+                    `${speedMultiplier.toFixed(1)}x - Slow motion (1:2,000,000 scale)` : 
+                    `${speedMultiplier.toFixed(1)}x - ধীর গতি (1:2,000,000 স্কেল)`;
+            } else if (speedMultiplier === 1) {
+                speedText = currentLanguage === 'en' ? 
+                    `1x - Real time scaled by 1:1,000,000` : 
+                    `1x - বাস্তব সময় 1:1,000,000 অনুপাতে`;
+            } else if (speedMultiplier > 1) {
+                speedText = currentLanguage === 'en' ? 
+                    `${speedMultiplier.toFixed(1)}x - Fast motion (1:500,000 scale)` : 
+                    `${speedMultiplier.toFixed(1)}x - দ্রুত গতি (1:500,000 স্কেল)`;
+            } else {
+                speedText = currentLanguage === 'en' ? 
+                    `${speedMultiplier.toFixed(1)}x - Real time scaled by 1:1,000,000` : 
+                    `${speedMultiplier.toFixed(1)}x - বাস্তব সময় 1:1,000,000 অনুপাতে`;
+            }
+            
+            speedElement.textContent = speedText;
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            stats.begin();
+
+            if (!isPaused) {
+                time += speedMultiplier * 0.01;
+                const system = systems[currentSystem];
+                celestialObjects.forEach((obj, i) => {
+                    if (!obj.userData.isStar) {
+                        const angle = time * obj.userData.speed;
+                        const distance = obj.userData.distance;
+                        const eccentric = obj.userData.eccentric || 0;
+                        const x = Math.cos(angle) * distance * (1 + eccentric * Math.cos(angle));
+                        const z = Math.sin(angle) * distance * Math.sqrt(1 - eccentric * eccentric);
+                        obj.position.set(is2DView ? x : x, is2DView ? 0 : z * 0.1, is2DView ? z : z);
+                        
+                        // Update label position
+                        if (i < labels.length) {
+                            labels[i].position.set(obj.position.x, obj.position.y + obj.userData.radius + 2, obj.position.z);
+                        }
+                        
+                        // Rotate planets
+                        obj.rotation.y += 0.01 * speedMultiplier;
+                        
+                        // Update day-night shader with sun position
+                        if (obj.material.type === 'ShaderMaterial' && obj.material.uniforms && obj.material.uniforms.sunPosition) {
+                            // Calculate direction from planet to sun (star)
+                            const sunPosition = new THREE.Vector3(0, 0, 0);
+                            const dirToSun = sunPosition.clone().sub(obj.position).normalize();
+                            obj.material.uniforms.sunPosition.value = dirToSun;
+                        }
+                    } else {
+                        // Rotate star
+                        obj.rotation.y += 0.002 * speedMultiplier;
+                    }
+                });
+            }
+
+            // Update camera if transitioning
+            if (cameraTransitioning) {
+                controls.update();
+            }
+
+            composer.render();
+            stats.end();
+            
+            // Ensure loading screen is hidden after a timeout
+            if (!loadingComplete) {
+                setTimeout(() => {
+                    document.getElementById('loading').style.display = 'none';
+                    loadingComplete = true;
+                }, 5000);
+            }
+        }
+
+        // Smooth camera transition
+        function smoothCameraTransition(targetPosition, targetLookAt, duration = 1000) {
+            cameraTransitioning = true;
+            const startPosition = camera.position.clone();
+            const startTarget = controls.target.clone();
+            const startTime = Date.now();
+            
+            function updateCamera() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const easeProgress = 1 - Math.pow(1 - progress, 3); // Cubic ease out
+                
+                camera.position.lerpVectors(startPosition, targetPosition, easeProgress);
+                controls.target.lerpVectors(startTarget, targetLookAt, easeProgress);
+                controls.update();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(updateCamera);
+                } else {
+                    cameraTransitioning = false;
+                }
+            }
+            
+            updateCamera();
+        }
+
+        // Make functions available globally
+        window.togglePause = function() {
+            isPaused = !isPaused;
+            document.getElementById('pause-btn').textContent = isPaused ? 
+                (currentLanguage === 'en' ? 'Play' : 'চালু করুন') : 
+                translations[currentLanguage]["pause-btn"];
+            updateSpeedIndicator();
+        };
+
+        window.resetView = function() {
+            is2DView = false;
+            document.getElementById('view-btn').textContent = translations[currentLanguage]["view-btn"];
+            const targetPosition = new THREE.Vector3(0, 50, 100);
+            const targetLookAt = new THREE.Vector3(0, 0, 0);
+            smoothCameraTransition(targetPosition, targetLookAt);
+            speedMultiplier = 1;
+            document.getElementById('speed').value = 1;
+            updateSpeedIndicator();
+        };
+
+        window.toggleOrbits = function() {
+            showOrbits = !showOrbits;
+            orbitPaths.forEach(orbit => orbit.visible = showOrbits);
+        };
+
+        window.toggleLabels = function() {
+            showLabels = !showLabels;
+            document.getElementById('labels-btn').textContent = showLabels ? 
+                translations[currentLanguage]["labels-btn"] : 
+                (currentLanguage === 'en' ? 'Show Labels' : 'লেবেল দেখান');
+            labels.forEach(label => label.visible = showLabels);
+        };
+
+        window.toggleEducationalPanel = function() {
+            showEducationalPanel = !showEducationalPanel;
+            document.getElementById('educationalPanel').style.display = showEducationalPanel ? 'block' : 'none';
+        };
+
+        window.toggleViewMode = function() {
+            is2DView = !is2DView;
+            document.getElementById('view-btn').textContent = is2DView ? 
+                (currentLanguage === 'en' ? 'Switch to 3D' : '3D তে পরিবর্তন') : 
+                translations[currentLanguage]["view-btn"];
+            
+            const targetPosition = new THREE.Vector3(0, is2DView ? 150 : 50, is2DView ? 0.1 : 100);
+            const targetLookAt = new THREE.Vector3(0, 0, 0);
+            smoothCameraTransition(targetPosition, targetLookAt);
+            
+            // Update orbit paths orientation
+            orbitPaths.forEach(orbit => {
+                orbit.rotation.x = THREE.MathUtils.degToRad(is2DView ? 0 : 90);
+            });
+        };
+
+        window.switchSystem = function() {
+            currentSystem = document.getElementById('systemSelect').value;
+            loadSystem(currentSystem);
+            resetView();
+        };
+
+        window.focusPlanet = function() {
+            const planetName = document.getElementById('focusSelect').value;
+            if (!planetName) return;
+            
+            const obj = celestialObjects.find(o => o.userData.name === planetName);
+            if (obj) {
+                const targetPosition = new THREE.Vector3(
+                    obj.position.x + obj.userData.radius * 3,
+                    obj.position.y + obj.userData.radius * 2,
+                    obj.position.z + obj.userData.radius * 3
+                );
+                smoothCameraTransition(targetPosition, obj.position);
+            }
+        };
+
+        // Speed control
+        document.getElementById('speed').addEventListener('input', (e) => {
+            speedMultiplier = parseFloat(e.target.value);
+            updateSpeedIndicator();
+        });
+
+        // Click and hover detection
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const tooltip = document.getElementById('tooltip');
+
+        renderer.domElement.addEventListener('click', (event) => {
+            event.preventDefault();
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(celestialObjects);
+
+            if (intersects.length > 0) {
+                const obj = intersects[0].object;
+                const data = obj.userData;
+                let infoHTML = `<h3>${data.name}</h3><p>${data.info}</p>`;
+                
+                // Add detailed information with colorful formatting
+                if (data.mass) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Mass' : 'ভর'}:</strong> ${data.mass}</p>`;
+                if (data.temperature) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Temperature' : 'তাপমাত্রা'}:</strong> ${data.temperature}</p>`;
+                if (data.orbitalPeriod) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Orbital Period' : 'কক্ষপথের সময়কাল'}:</strong> ${data.orbitalPeriod}</p>`;
+                if (data.realSpeed) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Orbital Speed' : 'কক্ষপথের গতি'}:</strong> ${data.realSpeed}</p>`;
+                if (data.atmosphere) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Atmosphere' : 'বায়ুমণ্ডল'}:</strong> ${data.atmosphere}</p>`;
+                if (data.surfaceTemp) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Surface Temperature' : 'পৃষ্ঠের তাপমাত্রা'}:</strong> ${data.surfaceTemp}</p>`;
+                if (data.moons) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Moons' : 'চাঁদ'}:</strong> ${data.moons}</p>`;
+                if (data.axialTilt) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Axial Tilt' : 'অক্ষীয় হেলন'}:</strong> ${data.axialTilt}°</p>`;
+                
+                if (data.habitable) {
+                    infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Habitable Zone' : 'বাসযোগ্য অঞ্চল'}:</strong> ${currentLanguage === 'en' ? 'Potentially suitable for liquid water.' : 'সম্ভাব্যভাবে তরল জলের জন্য উপযুক্ত।'}</p>`;
+                }
+                if (data.eccentric) {
+                    infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Eccentricity' : 'উৎকেন্দ্রিকতা'}:</strong> ${data.eccentric}</p>`;
+                }
+                
+                document.getElementById('info').innerHTML = infoHTML;
+                
+                // Focus on clicked object
+                const targetPosition = new THREE.Vector3(
+                    obj.position.x + obj.userData.radius * 3,
+                    obj.position.y + obj.userData.radius * 2,
+                    obj.position.z + obj.userData.radius * 3
+                );
+                smoothCameraTransition(targetPosition, obj.position);
+            }
+        });
+
+        renderer.domElement.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(celestialObjects);
+
+            if (intersects.length > 0) {
+                const obj = intersects[0].object;
+                tooltip.style.display = 'block';
+                tooltip.style.left = `${event.clientX + 10}px`;
+                tooltip.style.top = `${event.clientY + 10}px`;
+                
+                // Add speed to tooltip if available
+                if (obj.userData.realSpeed && !obj.userData.isStar) {
+                    tooltip.innerHTML = `${obj.userData.name}<br>${currentLanguage === 'en' ? 'Speed' : 'গতি'}: ${obj.userData.realSpeed}`;
+                } else {
+                    tooltip.textContent = obj.userData.name;
+                }
+            } else {
+                tooltip.style.display = 'none';
+            }
+        });
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Touch support for mobile devices
+        renderer.domElement.addEventListener('touchstart', (event) => {
+            event.preventDefault();
+            const touch = event.touches[0];
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((touch.clientX - rect.left) / renderer.domElement.clientWidth) * 2 - 1;
+            mouse.y = -((touch.clientY - rect.top) / renderer.domElement.clientHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(celestialObjects);
+            
+            if (intersects.length > 0) {
+                const obj = intersects[0].object;
+                const data = obj.userData;
+                let infoHTML = `<h3>${data.name}</h3><p>${data.info}</p>`;
+                
+                // Add detailed information with colorful formatting (same as click handler)
+                if (data.mass) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Mass' : 'ভর'}:</strong> ${data.mass}</p>`;
+                if (data.temperature) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Temperature' : 'তাপমাত্রা'}:</strong> ${data.temperature}</p>`;
+                if (data.orbitalPeriod) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Orbital Period' : 'কক্ষপথের সময়কাল'}:</strong> ${data.orbitalPeriod}</p>`;
+                if (data.realSpeed) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Orbital Speed' : 'কক্ষপথের গতি'}:</strong> ${data.realSpeed}</p>`;
+                if (data.atmosphere) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Atmosphere' : 'বায়ুমণ্ডল'}:</strong> ${data.atmosphere}</p>`;
+                if (data.surfaceTemp) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Surface Temperature' : 'পৃষ্ঠের তাপমাত্রা'}:</strong> ${data.surfaceTemp}</p>`;
+                if (data.moons) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Moons' : 'চাঁদ'}:</strong> ${data.moons}</p>`;
+                if (data.axialTilt) infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Axial Tilt' : 'অক্ষীয় হেলন'}:</strong> ${data.axialTilt}°</p>`;
+                
+                if (data.habitable) {
+                    infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Habitable Zone' : 'বাসযোগ্য অঞ্চল'}:</strong> ${currentLanguage === 'en' ? 'Potentially suitable for liquid water.' : 'সম্ভাব্যভাবে তরল জলের জন্য উপযুক্ত।'}</p>`;
+                }
+                if (data.eccentric) {
+                    infoHTML += `<p><strong>${currentLanguage === 'en' ? 'Eccentricity' : 'উৎকেন্দ্রিকতা'}:</strong> ${data.eccentric}</p>`;
+                }
+                
+                document.getElementById('info').innerHTML = infoHTML;
+                
+                // Focus on touched object
+                const targetPosition = new THREE.Vector3(
+                    obj.position.x + obj.userData.radius * 3,
+                    obj.position.y + obj.userData.radius * 2,
+                    obj.position.z + obj.userData.radius * 3
+                );
+                smoothCameraTransition(targetPosition, obj.position);
+            }
+        });
+
+        // Keyboard controls
+        window.addEventListener('keydown', (event) => {
+            switch(event.key) {
+                case ' ':
+                    togglePause();
+                    break;
+                case 'r':
+                    resetView();
+                    break;
+                case 'o':
+                    toggleOrbits();
+                    break;
+                case 'v':
+                    toggleViewMode();
+                    break;
+                case 'l':
+                    toggleLabels();
+                    break;
+                case 'e':
+                    toggleEducationalPanel();
+                    break;
+                case '+':
+                case '=':
+                    speedMultiplier = Math.min(speedMultiplier + 0.1, 2);
+                    document.getElementById('speed').value = speedMultiplier;
+                    updateSpeedIndicator();
+                    break;
+                case '-':
+                    speedMultiplier = Math.max(speedMultiplier - 0.1, 0);
+                    document.getElementById('speed').value = speedMultiplier;
+                    updateSpeedIndicator();
+                    break;
+            }
+        });
+
+        // Initialize speed indicator
+        updateSpeedIndicator();
+
+        // Debug WebGL support
+        if (!renderer.getContext()) {
+            console.error('WebGL not supported in this browser.');
+            document.getElementById('info').innerHTML = 'Error: WebGL is not supported in your browser. Please use a modern browser with WebGL enabled.';
+            document.getElementById('loading').style.display = 'none';
+        } else {
+            console.log('WebGL supported, starting animation...');
+            animate();
+            
+            // Force hide loading screen after 5 seconds as a fallback
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+                loadingComplete = true;
+            }, 5000);
+        }
+    </script>
+<footer-btn></footer-btn>
+<script>
+    // 定义自定义元素
+    class FooterBtn extends HTMLElement {
+        constructor() {
+            super();
+            // 创建 Shadow DOM
+            const shadow = this.attachShadow({ mode: 'open' });
+            // 创建组件的HTML结构
+            const wrapper = document.createElement('div');
+            wrapper.setAttribute('class', 'wrapper');
+            // 添加一些内容到组件中
+            wrapper.innerHTML = `
+                <div class="page-footer">
+                    <div class="tooltip-dialog">Not an official Manus website nor endorsed by Manus. Content may contain inaccuracies; double-check before use. Do not submit passwords, credit cards, or personal information.</div>
+                    <div class="footer-close-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <g clip-path="url(#clip0_5850_97234)">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M0.733398 8.00104C0.733398 3.98777 3.9868 0.734375 8.00006 0.734375C12.0133 0.734375 15.2667 3.98777 15.2667 8.00104C15.2667 12.0143 12.0133 15.2677 8.00006 15.2677C3.9868 15.2677 0.733398 12.0143 0.733398 8.00104Z" fill="white"/>
+                        <path d="M1.2334 8.00104C1.2334 4.26391 4.26294 1.23438 8.00006 1.23438C11.7372 1.23438 14.7667 4.26391 14.7667 8.00104C14.7667 11.7382 11.7372 14.7677 8.00006 14.7677C4.26294 14.7677 1.2334 11.7382 1.2334 8.00104Z" stroke="black" stroke-opacity="0.14" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M5.57576 5.57613C5.81007 5.34181 6.18997 5.34181 6.42429 5.57613L8.00002 7.15186L9.57576 5.57613C9.81007 5.34181 10.19 5.34181 10.4243 5.57613C10.6586 5.81044 10.6586 6.19034 10.4243 6.42465L8.84855 8.00039L10.4243 9.57613C10.6586 9.81044 10.6586 10.1903 10.4243 10.4247C10.19 10.659 9.81007 10.659 9.57576 10.4247L8.00002 8.84892L6.42429 10.4247C6.18997 10.659 5.81007 10.659 5.57576 10.4247C5.34145 10.1903 5.34145 9.81044 5.57576 9.57613L7.1515 8.00039L5.57576 6.42465C5.34145 6.19034 5.34145 5.81044 5.57576 5.57613Z" fill="#858481"/>
+                        </g>
+                        <defs>
+                        <clipPath id="clip0_5850_97234">
+                        <rect width="16" height="16" fill="white"/>
+                        </clipPath>
+                        </defs>
+                        </svg>
+                    </div>
+                    <div class="footer-bg">
+                        <div class="tooltip-box">
+                            <div class="tooltip-desc">This user-generated website was created with AI. Use with caution.</div>
+                            <span
+                                class="tooltip-icon"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                    <g clip-path="url(#clip0_4345_83044)">
+                                        <path
+                                            d="M6 8V6M6 4H6.005M11 6C11 8.76142 8.76142 11 6 11C3.23858 11 1 8.76142 1 6C1 3.23858 3.23858 1 6 1C8.76142 1 11 3.23858 11 6Z"
+                                            stroke="#858481"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        />
+                                    </g>
+                                    <defs>
+                                        <clipPath id="clip0_4345_83044">
+                                            <rect width="12" height="12" fill="white" />
+                                        </clipPath>
+                                    </defs>
+                                </svg>
+                            </span>
+                        </div>
+                    </div>
+                    <a href="https://manus.im/invitation?from=space" target="_blank" class="footer-button">
+                        <span class="footer-logo">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                <path
+                                    d="M13.2251 16.9379C14.4717 16.147 15.3336 11.9052 15.144 10.6421C15.144 10.6421 14.9464 9.96396 14.4643 9.96394C13.9821 9.96391 13.7815 10.4719 13.7815 10.4719C13.7815 10.4719 13.6546 10.9409 13.4555 11.5313C13.1474 12.4447 13.0178 13.5718 12.2143 13.8571C11.4107 14.1425 10.6071 13.8725 10.6071 13.8725C11.1535 15.9448 11.9785 17.7288 13.2251 16.9379Z"
+                                    fill="white"
+                                />
+                                <path
+                                    fill-rule="evenodd"
+                                    clip-rule="evenodd"
+                                    d="M7.04826 9.17689C6.59029 9.22824 6.34906 9.40136 6.26768 9.48274C5.94625 9.80417 5.78554 10.1256 5.78554 10.2863C5.78554 10.447 5.40745 9.53393 5.32437 9.44837C5.07703 9.19366 5.083 8.78667 5.33771 8.53933C5.69527 8.19212 6.28003 7.96925 6.90502 7.89918C7.55323 7.82651 8.3219 7.9075 9.09971 8.25205C10.0075 8.65415 10.4937 9.50199 10.6773 10.2768C10.7705 10.6701 10.7943 11.0743 10.7466 11.4426C10.7002 11.8002 10.5781 12.1826 10.3242 12.4736C9.79525 13.0799 9.01508 13.0116 8.593 12.9221C8.35518 12.8716 8.14542 12.7975 7.99786 12.738C7.92303 12.7079 7.86158 12.6804 7.81747 12.6597C7.79535 12.6493 7.77743 12.6406 7.7642 12.6341C7.75757 12.6308 7.75211 12.628 7.74786 12.6259L7.7424 12.6231L7.74037 12.622L7.73915 12.6214C7.73915 12.6214 7.7388 12.6212 8.03568 12.051L7.7388 12.6212C7.42389 12.4573 7.30152 12.069 7.46548 11.7541C7.62912 11.4398 8.01612 11.3173 8.3307 11.4798M8.3307 11.4798L8.33145 11.4802L8.3307 11.4798ZM8.3307 11.4798L8.33531 11.4822C8.34052 11.4847 8.3498 11.4893 8.36271 11.4953C8.38864 11.5075 8.42852 11.5254 8.4788 11.5457C8.58146 11.5871 8.71705 11.6341 8.85982 11.6644C9.19892 11.7363 9.32081 11.668 9.3554 11.6284C9.38325 11.5965 9.44396 11.4899 9.47154 11.2773C9.49771 11.0755 9.48663 10.8281 9.42625 10.5733C9.30267 10.0519 9.00685 9.61712 8.57899 9.42759C8.02117 9.1805 7.48301 9.12815 7.04826 9.17689"
+                                    fill="white"
+                                />
+                                <path
+                                    fill-rule="evenodd"
+                                    clip-rule="evenodd"
+                                    d="M2.79812 2.53348C2.64176 2.85224 2.7734 3.2374 3.09216 3.39376C3.55 3.61834 3.94731 3.83979 4.34068 4.28331C4.57627 4.54892 4.98258 4.57326 5.2482 4.33767C5.51381 4.10208 5.53815 3.69577 5.30256 3.43016C4.742 2.79815 4.16499 2.48794 3.65839 2.23944C3.33963 2.08308 2.95448 2.21473 2.79812 2.53348Z"
+                                    fill="white"
+                                />
+                                <path
+                                    fill-rule="evenodd"
+                                    clip-rule="evenodd"
+                                    d="M6.27275 0.662519C5.92831 0.748629 5.71889 1.09766 5.805 1.4421C5.86516 1.68274 5.92127 1.8885 5.97263 2.07686C6.07093 2.43738 6.15185 2.73415 6.21054 3.08969C6.26837 3.43999 6.59923 3.67708 6.94952 3.61926C7.29982 3.56143 7.53692 3.23058 7.47909 2.88028C7.40972 2.46006 7.3017 2.06246 7.19328 1.66338C7.14526 1.48666 7.09717 1.30966 7.05233 1.13027C6.96622 0.785827 6.61719 0.57641 6.27275 0.662519Z"
+                                    fill="white"
+                                />
+                                <path
+                                    d="M8.99979 3.21456C9.16051 2.57171 9.32122 2.08956 9.61377 1.60742"
+                                    stroke="white"
+                                    stroke-width="1.28571"
+                                    stroke-miterlimit="10"
+                                    stroke-linecap="round"
+                                />
+                                <path
+                                    fill-rule="evenodd"
+                                    clip-rule="evenodd"
+                                    d="M11.3613 6.26832C12.6366 6.52316 12.6368 6.52221 12.6368 6.52221L12.637 6.52126L12.6373 6.51931L12.6381 6.51527L12.6396 6.50658C12.6407 6.50054 12.6418 6.49395 12.6429 6.48687C12.6452 6.47271 12.6476 6.45641 12.65 6.43816C12.6548 6.40191 12.6596 6.35662 12.6628 6.30419C12.6689 6.20315 12.6702 6.05635 12.6443 5.88608C12.5954 5.56354 12.4075 4.95215 11.7455 4.59774L11.6146 4.52762L11.4715 4.48801L11.1424 5.7144C11.4358 5.8715 11.3613 6.26832 11.3613 6.26832ZM11.1573 7.07742L11.3613 6.26832L12.6366 6.52316L12.6296 6.56049L12.4237 7.37732C12.3841 7.57807 12.3789 7.69285 12.381 7.75349C12.3828 7.80284 12.3892 7.81904 12.3924 7.82698L12.3927 7.8279C12.4008 7.84841 12.4216 7.89289 12.4977 8.00832C12.5287 8.05537 12.561 8.10252 12.6021 8.1626C12.613 8.1785 12.6245 8.19531 12.6367 8.21327C12.6919 8.29416 12.7565 8.38953 12.825 8.49621C13.2527 9.16281 13.2947 9.80259 13.2925 10.2126C13.2924 10.2186 13.2924 10.2246 13.2923 10.2305C13.3435 10.2481 13.3978 10.2658 13.4555 10.2841C13.4745 10.2902 13.4997 10.2982 13.5262 10.3065C13.5634 10.3183 13.6031 10.3308 13.6314 10.3399C13.6872 10.3577 13.7584 10.381 13.8272 10.4067C13.8751 10.4245 13.9211 10.4423 13.9644 10.4603C14.0059 10.4775 14.0566 10.4995 14.1099 10.5264C14.1513 10.5473 14.2186 10.5831 14.2948 10.6359L14.9647 10.9242L14.955 11.7823C14.9493 12.2868 14.7463 12.8187 14.6023 13.148C14.4436 13.5111 14.2339 13.8983 14.0408 14.1556C13.7712 14.515 13.4657 14.8945 13.0981 15.1372C12.8815 15.2802 12.6198 15.394 12.3111 15.4313C12.0361 15.4645 11.7981 15.4277 11.6232 15.3851L11.5717 15.3745C11.5199 15.3639 11.4456 15.3486 11.3553 15.3298C11.1748 15.2922 10.9287 15.2404 10.6678 15.1837C10.1867 15.0793 9.53471 14.9331 9.22715 14.8311L9.20492 14.8237L9.18296 14.8155C9.04655 14.7649 8.81591 14.7081 8.43387 14.621C8.41077 14.6157 8.38722 14.6103 8.36328 14.6049C8.03371 14.5299 7.6281 14.4376 7.24401 14.3212C6.8462 14.2008 6.35418 14.0216 5.9364 13.7296C5.4979 13.4232 4.99936 12.8829 4.9716 12.0723C4.96744 11.951 4.97023 11.8337 4.97774 11.7224C4.78027 11.5084 4.61454 11.2286 4.53078 10.8703C4.44918 10.5212 4.49431 10.2118 4.55156 9.99459C4.60897 9.7768 4.69617 9.58643 4.76904 9.44413C4.79364 9.3961 4.81915 9.34874 4.8446 9.30298C4.60356 9.22692 4.3313 9.13294 4.06631 9.01999C3.72023 8.87246 3.22918 8.62908 2.86258 8.2362C2.66514 8.0246 2.4584 7.72132 2.37481 7.3248C2.28733 6.90985 2.36002 6.51171 2.53036 6.1708C2.94502 5.34093 3.73706 5.04773 4.44152 5.02237C5.07762 4.99946 5.75449 5.17745 6.36097 5.39016C6.91355 5.58397 7.70443 5.94444 8.3763 6.25842C8.5976 5.89554 8.88932 5.48549 9.16548 5.15432L9.22034 5.08854L9.28382 5.03075C9.75896 4.59828 10.2927 4.45288 10.6994 4.42169C10.8988 4.4064 11.0705 4.41781 11.1989 4.43448C11.2638 4.44291 11.3198 4.45295 11.3652 4.46245C11.388 4.46721 11.4083 4.47188 11.426 4.4762C11.4349 4.47837 11.4431 4.48045 11.4507 4.48243L11.4616 4.48531L11.4666 4.48668L11.4691 4.48735L11.4703 4.48768C11.4703 4.48768 11.4715 4.48801 11.1424 5.7144C11.1424 5.7144 10.6292 5.57232 10.188 5.96175C10.1836 5.96567 10.1792 5.96965 10.1747 5.97368C10.161 5.99009 10.1473 6.0067 10.1336 6.02351C10.1139 6.04768 10.0941 6.07224 10.0743 6.09711C10.0685 6.10441 10.0627 6.11174 10.0569 6.1191C9.61666 6.67768 9.64277 6.91103 8.83914 7.87543C8.83914 7.87543 8.4205 7.68157 8.1701 7.56386C7.9983 7.48311 7.81669 7.39774 7.63164 7.31169C7.03464 7.03411 6.40173 6.74946 5.94628 6.58972C4.82494 6.19643 3.99821 6.14651 3.69645 6.75042C3.29839 7.54707 4.9148 8.00866 5.72705 8.24061C5.8981 8.28945 6.03349 8.32811 6.10689 8.35758C6.52348 8.52479 6.55255 8.86031 6.42848 9.16103C6.35609 9.33651 6.31482 9.43541 6.10706 9.64317C5.78563 9.9646 5.73292 10.3452 5.7943 10.6078C5.82503 10.7392 5.88582 10.8348 5.95809 10.9044C6.15197 11.0909 6.42842 11.0897 6.42842 11.0897C6.42842 11.0897 6.25016 11.5453 6.26759 12.0541C6.27143 12.1661 6.30155 12.268 6.35346 12.3612C6.66163 12.9145 7.73774 13.1596 8.64189 13.3655C9.02162 13.452 9.37102 13.5316 9.62046 13.6242C10.0676 13.7726 11.8925 14.1433 11.8925 14.1433C12.2292 14.2317 12.438 14.1247 12.9919 13.3864C13.2219 13.0797 13.653 12.2123 13.6583 11.7435C13.5884 11.7134 13.5835 11.7029 13.5786 11.6924C13.5718 11.6779 13.565 11.6633 13.3882 11.5974C13.329 11.5754 13.2499 11.5504 13.1593 11.5218C12.7822 11.4029 12.2071 11.2215 12.0534 10.929C11.9788 10.787 11.9846 10.5964 11.9915 10.3736C12.0022 10.0271 12.0153 9.60261 11.732 9.16115C11.6624 9.05276 11.5957 8.95523 11.5333 8.864C11.1781 8.34469 10.9626 8.0296 11.1573 7.07742ZM5.21736 8.64574C5.21818 8.64341 5.21787 8.64394 5.21684 8.64717L5.21736 8.64574ZM13.2859 10.6214C13.2859 10.6214 13.2859 10.6164 13.2849 10.6077C13.2852 10.6173 13.2859 10.6214 13.2859 10.6214Z"
+                                    fill="white"
+                                />
+                            </svg>
+                        </span>
+                        <div class="title">Made with Manus</div>
+                        <div class="create-title">Create my website</div>
+                    </a>
+                </div>
+
+                <div class="page-footer-mobile">
+                    <div class="footer-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none">
+                            <path
+                                d="M13.2251 16.9379C14.4717 16.147 15.3336 11.9052 15.144 10.6421C15.144 10.6421 14.9464 9.96396 14.4643 9.96394C13.9821 9.96391 13.7815 10.4719 13.7815 10.4719C13.7815 10.4719 13.6546 10.9409 13.4555 11.5313C13.1474 12.4447 13.0178 13.5718 12.2143 13.8571C11.4107 14.1425 10.6071 13.8725 10.6071 13.8725C11.1535 15.9448 11.9785 17.7288 13.2251 16.9379Z"
+                                fill="white"
+                            />
+                            <path
+                                fill-rule="evenodd"
+                                clip-rule="evenodd"
+                                d="M7.04826 9.17689C6.59029 9.22824 6.34906 9.40136 6.26768 9.48274C5.94625 9.80417 5.78554 10.1256 5.78554 10.2863C5.78554 10.447 5.40745 9.53393 5.32437 9.44837C5.07703 9.19366 5.083 8.78667 5.33771 8.53933C5.69527 8.19212 6.28003 7.96925 6.90502 7.89918C7.55323 7.82651 8.3219 7.9075 9.09971 8.25205C10.0075 8.65415 10.4937 9.50199 10.6773 10.2768C10.7705 10.6701 10.7943 11.0743 10.7466 11.4426C10.7002 11.8002 10.5781 12.1826 10.3242 12.4736C9.79525 13.0799 9.01508 13.0116 8.593 12.9221C8.35518 12.8716 8.14542 12.7975 7.99786 12.738C7.92303 12.7079 7.86158 12.6804 7.81747 12.6597C7.79535 12.6493 7.77743 12.6406 7.7642 12.6341C7.75757 12.6308 7.75211 12.628 7.74786 12.6259L7.7424 12.6231L7.74037 12.622L7.73915 12.6214C7.73915 12.6214 7.7388 12.6212 8.03568 12.051L7.7388 12.6212C7.42389 12.4573 7.30152 12.069 7.46548 11.7541C7.62912 11.4398 8.01612 11.3173 8.3307 11.4798M8.3307 11.4798L8.33145 11.4802L8.3307 11.4798ZM8.3307 11.4798L8.33531 11.4822C8.34052 11.4847 8.3498 11.4893 8.36271 11.4953C8.38864 11.5075 8.42852 11.5254 8.4788 11.5457C8.58146 11.5871 8.71705 11.6341 8.85982 11.6644C9.19892 11.7363 9.32081 11.668 9.3554 11.6284C9.38325 11.5965 9.44396 11.4899 9.47154 11.2773C9.49771 11.0755 9.48663 10.8281 9.42625 10.5733C9.30267 10.0519 9.00685 9.61712 8.57899 9.42759C8.02117 9.1805 7.48301 9.12815 7.04826 9.17689"
+                                fill="white"
+                            />
+                            <path
+                                fill-rule="evenodd"
+                                clip-rule="evenodd"
+                                d="M2.79812 2.53348C2.64176 2.85224 2.7734 3.2374 3.09216 3.39376C3.55 3.61834 3.94731 3.83979 4.34068 4.28331C4.57627 4.54892 4.98258 4.57326 5.2482 4.33767C5.51381 4.10208 5.53815 3.69577 5.30256 3.43016C4.742 2.79815 4.16499 2.48794 3.65839 2.23944C3.33963 2.08308 2.95448 2.21473 2.79812 2.53348Z"
+                                fill="white"
+                            />
+                            <path
+                                fill-rule="evenodd"
+                                clip-rule="evenodd"
+                                d="M6.27275 0.662519C5.92831 0.748629 5.71889 1.09766 5.805 1.4421C5.86516 1.68274 5.92127 1.8885 5.97263 2.07686C6.07093 2.43738 6.15185 2.73415 6.21054 3.08969C6.26837 3.43999 6.59923 3.67708 6.94952 3.61926C7.29982 3.56143 7.53692 3.23058 7.47909 2.88028C7.40972 2.46006 7.3017 2.06246 7.19328 1.66338C7.14526 1.48666 7.09717 1.30966 7.05233 1.13027C6.96622 0.785827 6.61719 0.57641 6.27275 0.662519Z"
+                                fill="white"
+                            />
+                            <path
+                                d="M8.99979 3.21456C9.16051 2.57171 9.32122 2.08956 9.61377 1.60742"
+                                stroke="white"
+                                stroke-width="1.28571"
+                                stroke-miterlimit="10"
+                                stroke-linecap="round"
+                            />
+                            <path
+                                fill-rule="evenodd"
+                                clip-rule="evenodd"
+                                d="M11.3613 6.26832C12.6366 6.52316 12.6368 6.52221 12.6368 6.52221L12.637 6.52126L12.6373 6.51931L12.6381 6.51527L12.6396 6.50658C12.6407 6.50054 12.6418 6.49395 12.6429 6.48687C12.6452 6.47271 12.6476 6.45641 12.65 6.43816C12.6548 6.40191 12.6596 6.35662 12.6628 6.30419C12.6689 6.20315 12.6702 6.05635 12.6443 5.88608C12.5954 5.56354 12.4075 4.95215 11.7455 4.59774L11.6146 4.52762L11.4715 4.48801L11.1424 5.7144C11.4358 5.8715 11.3613 6.26832 11.3613 6.26832ZM11.1573 7.07742L11.3613 6.26832L12.6366 6.52316L12.6296 6.56049L12.4237 7.37732C12.3841 7.57807 12.3789 7.69285 12.381 7.75349C12.3828 7.80284 12.3892 7.81904 12.3924 7.82698L12.3927 7.8279C12.4008 7.84841 12.4216 7.89289 12.4977 8.00832C12.5287 8.05537 12.561 8.10252 12.6021 8.1626C12.613 8.1785 12.6245 8.19531 12.6367 8.21327C12.6919 8.29416 12.7565 8.38953 12.825 8.49621C13.2527 9.16281 13.2947 9.80259 13.2925 10.2126C13.2924 10.2186 13.2924 10.2246 13.2923 10.2305C13.3435 10.2481 13.3978 10.2658 13.4555 10.2841C13.4745 10.2902 13.4997 10.2982 13.5262 10.3065C13.5634 10.3183 13.6031 10.3308 13.6314 10.3399C13.6872 10.3577 13.7584 10.381 13.8272 10.4067C13.8751 10.4245 13.9211 10.4423 13.9644 10.4603C14.0059 10.4775 14.0566 10.4995 14.1099 10.5264C14.1513 10.5473 14.2186 10.5831 14.2948 10.6359L14.9647 10.9242L14.955 11.7823C14.9493 12.2868 14.7463 12.8187 14.6023 13.148C14.4436 13.5111 14.2339 13.8983 14.0408 14.1556C13.7712 14.515 13.4657 14.8945 13.0981 15.1372C12.8815 15.2802 12.6198 15.394 12.3111 15.4313C12.0361 15.4645 11.7981 15.4277 11.6232 15.3851L11.5717 15.3745C11.5199 15.3639 11.4456 15.3486 11.3553 15.3298C11.1748 15.2922 10.9287 15.2404 10.6678 15.1837C10.1867 15.0793 9.53471 14.9331 9.22715 14.8311L9.20492 14.8237L9.18296 14.8155C9.04655 14.7649 8.81591 14.7081 8.43387 14.621C8.41077 14.6157 8.38722 14.6103 8.36328 14.6049C8.03371 14.5299 7.6281 14.4376 7.24401 14.3212C6.8462 14.2008 6.35418 14.0216 5.9364 13.7296C5.4979 13.4232 4.99936 12.8829 4.9716 12.0723C4.96744 11.951 4.97023 11.8337 4.97774 11.7224C4.78027 11.5084 4.61454 11.2286 4.53078 10.8703C4.44918 10.5212 4.49431 10.2118 4.55156 9.99459C4.60897 9.7768 4.69617 9.58643 4.76904 9.44413C4.79364 9.3961 4.81915 9.34874 4.8446 9.30298C4.60356 9.22692 4.3313 9.13294 4.06631 9.01999C3.72023 8.87246 3.22918 8.62908 2.86258 8.2362C2.66514 8.0246 2.4584 7.72132 2.37481 7.3248C2.28733 6.90985 2.36002 6.51171 2.53036 6.1708C2.94502 5.34093 3.73706 5.04773 4.44152 5.02237C5.07762 4.99946 5.75449 5.17745 6.36097 5.39016C6.91355 5.58397 7.70443 5.94444 8.3763 6.25842C8.5976 5.89554 8.88932 5.48549 9.16548 5.15432L9.22034 5.08854L9.28382 5.03075C9.75896 4.59828 10.2927 4.45288 10.6994 4.42169C10.8988 4.4064 11.0705 4.41781 11.1989 4.43448C11.2638 4.44291 11.3198 4.45295 11.3652 4.46245C11.388 4.46721 11.4083 4.47188 11.426 4.4762C11.4349 4.47837 11.4431 4.48045 11.4507 4.48243L11.4616 4.48531L11.4666 4.48668L11.4691 4.48735L11.4703 4.48768C11.4703 4.48768 11.4715 4.48801 11.1424 5.7144C11.1424 5.7144 10.6292 5.57232 10.188 5.96175C10.1836 5.96567 10.1792 5.96965 10.1747 5.97368C10.161 5.99009 10.1473 6.0067 10.1336 6.02351C10.1139 6.04768 10.0941 6.07224 10.0743 6.09711C10.0685 6.10441 10.0627 6.11174 10.0569 6.1191C9.61666 6.67768 9.64277 6.91103 8.83914 7.87543C8.83914 7.87543 8.4205 7.68157 8.1701 7.56386C7.9983 7.48311 7.81669 7.39774 7.63164 7.31169C7.03464 7.03411 6.40173 6.74946 5.94628 6.58972C4.82494 6.19643 3.99821 6.14651 3.69645 6.75042C3.29839 7.54707 4.9148 8.00866 5.72705 8.24061C5.8981 8.28945 6.03349 8.32811 6.10689 8.35758C6.52348 8.52479 6.55255 8.86031 6.42848 9.16103C6.35609 9.33651 6.31482 9.43541 6.10706 9.64317C5.78563 9.9646 5.73292 10.3452 5.7943 10.6078C5.82503 10.7392 5.88582 10.8348 5.95809 10.9044C6.15197 11.0909 6.42842 11.0897 6.42842 11.0897C6.42842 11.0897 6.25016 11.5453 6.26759 12.0541C6.27143 12.1661 6.30155 12.268 6.35346 12.3612C6.66163 12.9145 7.73774 13.1596 8.64189 13.3655C9.02162 13.452 9.37102 13.5316 9.62046 13.6242C10.0676 13.7726 11.8925 14.1433 11.8925 14.1433C12.2292 14.2317 12.438 14.1247 12.9919 13.3864C13.2219 13.0797 13.653 12.2123 13.6583 11.7435C13.5884 11.7134 13.5835 11.7029 13.5786 11.6924C13.5718 11.6779 13.565 11.6633 13.3882 11.5974C13.329 11.5754 13.2499 11.5504 13.1593 11.5218C12.7822 11.4029 12.2071 11.2215 12.0534 10.929C11.9788 10.787 11.9846 10.5964 11.9915 10.3736C12.0022 10.0271 12.0153 9.60261 11.732 9.16115C11.6624 9.05276 11.5957 8.95523 11.5333 8.864C11.1781 8.34469 10.9626 8.0296 11.1573 7.07742ZM5.21736 8.64574C5.21818 8.64341 5.21787 8.64394 5.21684 8.64717L5.21736 8.64574ZM13.2859 10.6214C13.2859 10.6214 13.2859 10.6164 13.2849 10.6077C13.2852 10.6173 13.2859 10.6214 13.2859 10.6214Z"
+                                fill="white"
+                            />
+                        </svg>
+                        <div class="title">Made with Manus</div>
+                        <div class="create-title">Create my website</div>
+                    </div>
+                    <div class="footer-dialog">
+                        <div class="dialog-box">
+                            <div class="dialog-header">
+                                <div class="dialog-header-title">Made with Manus</div>
+                                <span class="dialog-header-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                        <path
+                                            fill-rule="evenodd"
+                                            clip-rule="evenodd"
+                                            d="M3.2729 3.27192C3.5365 3.00832 3.96389 3.00832 4.22749 3.27192L9.0002 8.04462L13.7729 3.27192C14.0365 3.00832 14.4639 3.00832 14.7275 3.27192C14.9911 3.53553 14.9911 3.96291 14.7275 4.22652L9.95479 8.99922L14.7275 13.7719C14.9911 14.0355 14.9911 14.4629 14.7275 14.7265C14.4639 14.9901 14.0365 14.9901 13.7729 14.7265L9.0002 9.95381L4.22749 14.7265C3.96389 14.9901 3.5365 14.9901 3.2729 14.7265C3.00929 14.4629 3.00929 14.0355 3.2729 13.7719L8.0456 8.99922L3.2729 4.22652C3.00929 3.96291 3.00929 3.53553 3.2729 3.27192Z"
+                                            fill="#858481"
+                                        />
+                                    </svg>
+                                </span>
+                            </div>
+                            <div class="dialog-body">
+                                <div>This user-generated website was created with AI. Use with caution.</div>
+                                <div>
+                                    Not an official Manus website nor endorsed by Manus. Content may contain inaccuracies; double-check before use. Do not submit
+                                    passwords, credit cards, or personal information.
+                                </div>
+                            </div>
+                            <div class="dialog-footer">
+                                <div class="dialog-footer-button-left">Cancel</div>
+                                <div class="dialog-footer-button-right" onclick="createSite()">Create my website</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            // 创建样式
+            const style = document.createElement('style');
+            style.textContent = `
+            @keyframes changeWidth {
+                0% {
+                    width: 150px;
+                    background-color: transparent;
+                }
+                100% {
+                    width: 574px;
+                    background-color: #fff;
+                }
+            }
+
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+                border: unset;
+            }
+
+            * {
+                line-height: 1.2;
+                text-shadow: initial;
+                font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            }
+
+            a {
+                text-decoration: unset;
+            }
+
+            .page-footer-mobile {
+                z-index: 10000;
+                display: none;
+                position: absolute;
+                right: 16px;
+                bottom: 16px;
+            }
+
+            .page-footer {
+                z-index: 10000;
+                display: flex;
+                padding: 4px 4px 4px 12px;
+                align-items: center;
+                gap: 16px;
+                position: fixed;
+                right: 16px;
+                bottom: 16px;
+                border-radius: 24px;
+                border: 1px solid transparent;
+                background: transparent;
+                transition: 0.3s;
+            }
+
+            .footer-close-btn {
+                display: none;
+                z-index: 10002;
+                cursor: pointer;
+                position: absolute;
+                right: -3px;
+                top: -3px;
+            }
+
+            .footer-bg {
+                overflow: hidden;
+                position: absolute;
+                right: 0px;
+                bottom: 0px;
+                height: 38px;
+                width: 150px;
+                background-color: transparent;
+                border-radius: 24px;
+            }
+
+            .tooltip-box {
+                display: none;
+                transition: 0.3s;
+                z-index: 10001;
+                align-items: center;
+                gap: 1px;
+            }
+
+            .tooltip-desc {
+                color: #858481;
+                /* Label/Primary */
+                font-size: 12px;
+                font-style: normal;
+                font-weight: 400;
+                line-height: 16px; /* 133.333% */
+            }
+
+            .footer-button {
+                z-index: 10001;
+                right: 16px;
+                bottom: 16px;
+                user-select: none;
+                cursor: pointer;
+                display: flex;
+                padding: 5px 10px;
+                align-items: center;
+                height: 30px;
+                gap: 2px;
+                transition: 0.3s;
+                border-radius: 14px;
+                border: 1px solid rgba(0, 0, 0, 0.06);
+                background: #1a1a19;
+                box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.06), 0px 8px 32px 0px rgba(0, 0, 0, 0.06);
+            }
+
+            .footer-logo {
+                width: 18px;
+                height: 18px;
+            }
+
+            .footer-button:hover .create-title {
+                opacity: 0.8;
+            }
+
+            .footer-button:hover .footer-logo {
+                opacity: 0.8;
+            }
+
+            .page-footer:hover .footer-close-btn {
+                display: block;
+            }
+
+            .page-footer:hover .create-title {
+                display: block;
+            }
+
+            .page-footer:hover .title {
+                display: none;
+            }
+
+            .page-footer:hover .footer-bg {
+                animation: changeWidth 0.3s ease-in-out forwards;
+                border: 1px solid rgba(0, 0, 0, 0.06);
+                background: #fff;
+                box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.06), 0px 8px 32px 0px rgba(0, 0, 0, 0.06);
+            }
+
+            .page-footer:hover .tooltip-box {
+                position: absolute;
+                text-wrap-mode: nowrap;
+                display: flex;
+                left: 10px;
+                top: 9px;
+            }
+
+            .tooltip-icon {
+                position: relative;
+                cursor: pointer;
+            }
+
+            .tooltip-dialog {
+                display: none;
+                position: absolute;
+                bottom: 154%;
+                left: -10%;
+                transform: translateX(-50%);
+                padding: 10px;
+                border-radius: 12px;
+                font-size: 12px;
+                line-height: 16px;
+                background-color: #171818;
+                color: #fff;
+                max-width: 280px;
+                width: max-content;
+            }
+
+            .title {
+                color: #fff;
+                font-size: 12px;
+                font-style: normal;
+                font-weight: 400;
+                line-height: 16px;
+            }
+
+            .create-title {
+                display: none;
+                color: #fff;
+                font-size: 12px;
+                font-style: normal;
+                font-weight: 400;
+            }
+
+            .footer-dialog {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .dialog-box {
+                display: flex;
+                width: 358px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+                border-radius: 20px;
+                border: 1px solid rgba(255, 255, 255, 0.04);
+                background: #fff;
+
+                /* menu/main */
+                box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.02), 0px 4px 32px 0px rgba(0, 0, 0, 0.16);
+                backdrop-filter: blur(40px);
+            }
+
+            .dialog-header {
+                display: flex;
+                padding: 16px 12px 8px 16px;
+                align-items: flex-start;
+                gap: 16px;
+                align-self: stretch;
+            }
+
+            .dialog-header-title {
+                flex: 1;
+                color: #34322d;
+                font-size: 18px;
+                font-style: normal;
+                font-weight: 600;
+            }
+
+            .dialog-body {
+                display: flex;
+                padding: 0px 16px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+                align-self: stretch;
+                color: #535350;
+                font-size: 16px;
+                font-style: normal;
+                font-weight: 400;
+                line-height: 24px;
+            }
+
+            .dialog-footer {
+                display: flex;
+                padding: 16px;
+                align-items: flex-start;
+                gap: 12px;
+                align-self: stretch;
+            }
+
+            .dialog-footer-button-left {
+                display: flex;
+                width: 119px;
+                min-width: 114px;
+                min-height: 48px;
+                padding: 12px 24px;
+                justify-content: center;
+                align-items: center;
+                gap: 6px;
+                border-radius: 12px;
+                background: rgba(55, 53, 47, 0.06);
+                color: #34322d;
+                font-size: 16px;
+                font-style: normal;
+                font-weight: 600;
+            }
+
+            .dialog-footer-button-right {
+                display: flex;
+                min-width: 114px;
+                min-height: 48px;
+                padding: 12px 24px;
+                justify-content: center;
+                align-items: center;
+                gap: 6px;
+                flex: 1 0 0;
+                border-radius: 12px;
+                background: #1a1a19;
+                color: #fff;
+                font-size: 16px;
+                font-style: normal;
+                font-weight: 600;
+            }
+
+            @media (max-width: 600px) {
+                .page-footer {
+                    display: none;
+                }
+                .page-footer-mobile {
+                    display: block;
+                }
+                .footer-button {
+                    position: fixed
+                }
+            }
+            `;
+            // 将样式和内容添加到Shadow DOM
+            shadow.appendChild(style);
+            shadow.appendChild(wrapper);
+
+            // 在connectedCallback中设置事件监听器
+            this.setupEventListeners(shadow);
+        }
+        onclickEvent(shadow, domStr, fn) {
+            const clickDom = shadow.querySelector(domStr);
+            if (clickDom) {
+                clickDom.onclick = (event) => {
+                    fn(event, clickDom);
+                };
+            }
+        }
+        setupEventListeners(shadow) {
+            const changeDialogStyle = (displayStatus) => {
+                const dialog = shadow.querySelector('.footer-dialog');
+                if (dialog) {
+                    dialog.style.display = displayStatus;
+                }
+            };
+
+            const createSite = () => {
+                window.open('https://manus.im/invitation?from=space', '_blank');
+                changeDialogStyle('none');
+            };
+
+            this.onclickEvent(shadow, '.page-footer-mobile .dialog-footer-button-left', () => {
+                changeDialogStyle('none');
+            });
+
+            this.onclickEvent(shadow, '.page-footer-mobile .dialog-footer-button-right', () => {
+                createSite();
+            });
+
+            this.onclickEvent(shadow, '.page-footer-mobile .dialog-header-icon', () => {
+                changeDialogStyle('none');
+            });
+
+            this.onclickEvent(shadow, '.page-footer-mobile .footer-button', () => {
+                changeDialogStyle('flex');
+            });
+
+            this.onclickEvent(shadow, '.footer-close-btn', () => {
+                localStorage.setItem('embedClosed', 'true');
+                shadow.querySelector('.page-footer').style.display = 'none';
+                shadow.querySelector('.page-footer-mobile').style.display = 'none';
+            });
+
+            this.onclickEvent(shadow, '.page-footer-mobile .footer-dialog', (event, dialog) => {
+                if (event.target === dialog) {
+                    changeDialogStyle('none');
+                }
+            });
+
+            const tooltipIcon = shadow.querySelector('.tooltip-icon');
+            const tooltipDialog = shadow.querySelector('.tooltip-dialog');
+
+            tooltipIcon.addEventListener('mouseenter', function () {
+                tooltipDialog.style.display = 'block';
+            });
+
+            tooltipIcon.addEventListener('mouseleave', function () {
+                tooltipDialog.style.display = 'none';
+            });
+
+            if (localStorage.getItem('embedClosed')) {
+                shadow.querySelector('.page-footer').style.display = 'none';
+                shadow.querySelector('.page-footer-mobile').style.display = 'none';
+            }
+        }
+    }
+    // 注册自定义元素
+    customElements.define('footer-btn', FooterBtn);
+</script>
+<script
+			defer
+			data-domain="manus.space"
+			src="https://plausible.io/js/script.file-downloads.hash.outbound-links.pageview-props.revenue.tagged-events.js"
+		></script>
+		<script>
+			window.plausible =
+				window.plausible ||
+				function () {
+					(window.plausible.q = window.plausible.q || []).push(arguments);
+				};
+			plausible('custom-pageview', {
+			  props: {
+    			domain: window.location.host
+  			}
+			})
+		</script></body>
+</html>
